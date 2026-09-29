@@ -331,7 +331,34 @@ rule, tested against `requests_7505`.
   different forms, not two separate bugs. Full trace-level detail in
   `experiments/CHANGELOG.md`.
 
-Stopped here per the round's scope (two hypotheses, two tests) rather than
+Stopped there per the round's scope (two hypotheses, two tests) rather than
 continuing to iterate unilaterally — next-round ideas noted in the
 CHANGELOG addendum (stronger same-call-detection wording; trying a lower
 `thinking_budget` to force shorter, more decisive turns).
+
+**Round 2**: replaced the general "don't repeat reasoning" framing with a
+mandatory, mechanical pre-call check ("compare this call's exact args
+against every prior call this session; identical = forbidden, whether the
+prior call succeeded or failed"). Tested on `requests_7505` again — the
+exact task where round 1's general framing had failed (literal 3x `grep`
+repeat).
+
+**First clean completion of the whole project.** `error: null` — no
+timeout, no budget exhaustion, for the first time on any real
+(non-`--skip-agent-patch`) proxy-model run. Finished in 338.56s (well under
+the 15-min budget) with a real 609-byte patch, 11 tool calls (down from 14
+in round 1 on the same task — more efficient, not just longer). `grep` was
+still run twice, but this time the model actually *used* the second
+result instead of discarding it and repeating again; it also caught its
+own confusion mid-task about which file it was editing and self-corrected,
+rather than continuing blindly.
+
+Interesting wrinkle: the generated fix removed a `hasattr` fallback
+(`isinstance(fp, _SupportsRead) or hasattr(fp, "read")` →
+`isinstance(fp, _SupportsRead)`) on a task titled "Add hasattr checks" —
+plausibly the wrong direction. If so, this is the **first observed
+Reasoning-layer failure** in the whole project — exactly what step 5
+predicted would become visible once Operational failures stopped blocking
+everything. Not confirmed without reading the full problem statement; noted
+for a future round, not chased further now. Full detail in
+`experiments/CHANGELOG.md`.

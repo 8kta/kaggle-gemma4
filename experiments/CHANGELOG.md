@@ -426,3 +426,45 @@ Entry format:
   general framing, or try lowering `thinking_budget` to force shorter,
   more decisive turns instead of letting the model reason at length before
   each (repeated) action.
+
+## 2026-09-29 — 2026-09-29_step7-requests-v3
+- Hypothesis: step 7 v3 prompt: replaced the general 'don't repeat reasoning' framing with a mandatory mechanical pre-call check ('compare this call's exact args against every prior call this session; identical = forbidden'), covering both failed-and-repeated and succeeded-and-repeated cases. v2 failed to stop requests_7505 from literally repeating the same grep 3x -- does the more concrete/mechanical version stop it this time?
+- Change: `swegemma eval --sandbox docker` against task(s) requests_7505, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step7-requests-v3/`
+- Commit: `cd3b78c9643cb6de0a96b3f2dbedadafadde21e8` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/4cf217aa6f9b4c6782f5b868009c02ec
+
+### Analysis addendum — first clean completion of the whole project
+- **`error: null` — no timeout, no budget exhaustion, for the first time
+  ever on a real (non-`--skip-agent-patch`) proxy-model run.** Finished in
+  338.56s, well inside the 15-min budget, with a real `agent_patch_size=609`
+  and `test_exit_code=1` (patch applied, tests ran and failed — not a
+  collection error). `tool_calls=11`, down from 14 in the v2 attempt on the
+  same task, i.e. *more efficient*, not just longer.
+- **The mechanical rule worked where the general framing (v2) didn't.**
+  `grep` was still run twice (not once), but critically the model *used*
+  the second result this time ("The grep output provided several hits")
+  instead of discarding it and re-running again — v2's literal 3x repeat on
+  this exact task did not recur. It also caught its own confusion mid-task
+  at step 13 ("Wait, the file path is `src/requests/adapters.py`, but the
+  content was read from `src/requests/models.py`...") instead of plowing
+  ahead — a qualitatively new kind of self-correction not seen in any prior
+  trace this project.
+- **First observed Reasoning-layer (not Operational) issue — exactly as
+  step 5 predicted.** The generated fix changed
+  `isinstance(fp, _SupportsRead) or hasattr(fp, "read")` →
+  `isinstance(fp, _SupportsRead)` (dropped the `hasattr` fallback), while
+  the task's title is "Add hasattr checks for remaining protocol isinstance
+  checks" — plausibly the opposite of the intended direction. Step 5 noted
+  the model "never gets far enough for a right-file-wrong-logic failure to
+  become observable" while blocked at the Operational layer; this is the
+  first task where it got far enough to potentially exhibit exactly that.
+  Not confirmed as a genuine reasoning error without reading the task's
+  full problem statement/reference patch — noted here as a new, different
+  category of thing to watch for in future rounds, not chased further this
+  round.
+- **v3 prompt change kept** (the mechanical pre-call check superseding the
+  v2 general framing) — this is the current state of `system.md` going
+  forward.
