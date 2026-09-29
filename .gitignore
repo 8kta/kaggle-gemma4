@@ -1,0 +1,26 @@
+# Native swegemma eval output — regenerated locally, not tracked
+results/
+
+# Per-run trace/log/patch artifacts are large; keep only experiments/CHANGELOG.md
+# and any explicit per-run summary.json you choose to commit
+experiments/*/
+!experiments/CHANGELOG.md
+
+# MLflow local file-backed tracking store (if used outside the localhost:5001 server)
+mlruns/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Env/secrets — must never end up in submission/ or be committed
+.env
+*.env
+
+# LoRA adapter weights are large binary artifacts — track intentionally, not by default
+adapters/**/*.safetensors
+
+# OS cruft
+.DS_Store

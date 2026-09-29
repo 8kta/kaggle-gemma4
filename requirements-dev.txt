@@ -1,0 +1,6 @@
+# Dev-only dependencies. Nothing in this file may be imported from anything
+# under submission/ — see agent-ideas/claude-idea.md step 2 and step 11
+# (submission isolation checks).
+
+mlflow
+kagglehub
