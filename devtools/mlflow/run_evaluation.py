@@ -23,6 +23,9 @@ Example:
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -65,10 +68,46 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def snapshot_submission(submission_dir: Path, dest: Path) -> None:
+# Large binary weight files get hard-linked instead of copied so repeated
+# snapshots don't each duplicate hundreds of MB-to-GB of LoRA adapter weights
+# on disk. Hard links only work within the same filesystem/device, which
+# holds here since experiments/ and submission/ are both inside this repo.
+LARGE_BINARY_SUFFIXES = {".safetensors"}
+
+
+def snapshot_submission(submission_dir: Path, dest: Path) -> dict[str, str]:
+    """Snapshot submission_dir into dest. Returns {relpath: method} for any
+    file handled specially (hardlink, or copy-fallback with a reason)."""
     if dest.exists():
         shutil.rmtree(dest)
-    shutil.copytree(submission_dir, dest)
+    dest.mkdir(parents=True)
+
+    manifest: dict[str, str] = {}
+    for src in sorted(submission_dir.rglob("*")):
+        rel = src.relative_to(submission_dir)
+        target = dest / rel
+        if src.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        is_large_binary = src.suffix.lower() in LARGE_BINARY_SUFFIXES or "adapters" in rel.parts
+        if is_large_binary:
+            try:
+                os.link(src, target)
+                digest = hashlib.sha256(src.read_bytes()).hexdigest()
+                manifest[str(rel)] = f"hardlink sha256:{digest}"
+                continue
+            except OSError as e:
+                print(f"[run_evaluation] NOTE: hard link failed for {rel} ({e}); "
+                      f"falling back to a real copy (uses full disk space).", file=sys.stderr)
+        shutil.copy2(src, target)
+        if is_large_binary:
+            digest = hashlib.sha256(src.read_bytes()).hexdigest()
+            manifest[str(rel)] = f"copy sha256:{digest}"
+
+    if manifest:
+        (dest / "ADAPTERS_MANIFEST.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
+    return manifest
 
 
 def check_git_dirty(repo_dir: Path) -> bool:
