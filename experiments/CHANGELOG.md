@@ -60,3 +60,27 @@ Entry format:
   via `docker inspect`.
 - Results dir: `results/00_structural/`
 - Commit: see below.
+
+## 2026-09-29 — 2026-09-29_wrapper-smoke
+- Hypothesis: Validate the `devtools/mlflow/run_evaluation.py` + MLflow logging
+  wrapper end-to-end using the same 4-task smoke cohort from the step-1
+  structural test. First attempt caught a real bug: a freshly-created MLflow
+  experiment defaulted to a local-filesystem artifact root the client
+  couldn't write to, and the error handling was too coarse (one failed
+  artifact call aborted the whole parent run, losing already-logged
+  tags/metrics). Fixed by explicitly creating experiments with a proxied
+  `mlflow-artifacts:` location and making artifact logging fail-soft per call.
+- Change: `swegemma eval --sandbox docker --skip-agent-patch` against task(s)
+  fastapi_15661, requests_7505, rich_4070, httpx_3672, backend=none,
+  env=local-mac, fidelity=structural.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/4 (expected — same
+  `--skip-agent-patch` semantics as the step-1 structural test). Verified via
+  REST API: parent run `FINISHED` with all 3 expected artifacts
+  (config_snapshot/, summary.json, task_results.jsonl); 4 child runs
+  `FINISHED` with correct tags/metrics; the one checked child run
+  (fastapi_15661, unresolved) correctly had its trace + test-output log
+  attached per the fail-only artifact policy.
+- Results dir: `results/2026-09-29_wrapper-smoke/`
+- Commit: `58194788c7a4a8858b7070b660877099743e4d4b` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/749cdfb2c02f42d5a3a1020e5bb821c2

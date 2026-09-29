@@ -89,3 +89,73 @@ It does, in order:
   Container A / the actual agent loop entirely). A true end-to-end run needs
   either the real model on rented GPU or a local stand-in model — see plan
   step 3 ("three baselines").
+
+## Development log / experiment tracking (plan step 2)
+
+Every eval run should go through `devtools/mlflow/run_evaluation.py` rather
+than calling `swegemma eval` directly — it wraps the file-based logging
+practice (always the source of truth) with best-effort MLflow logging
+(purely additive, never blocking):
+
+```
+python3 devtools/mlflow/run_evaluation.py \
+  --label 2026-09-29_my-change \
+  --submission-dir submission \
+  --task-ids fastapi_15661 requests_7505 \
+  --backend gemma-4-31b-qat --env local-mac --fidelity official-model \
+  --cohort smoke \
+  --hypothesis "What you expect this change to do"
+```
+
+What it does, every time, regardless of whether MLflow is reachable:
+1. Snapshots the exact submission config used to
+   `experiments/<label>/submission_snapshot/`.
+2. Warns (doesn't block) if `submission/` has uncommitted changes — the run's
+   `config_hash` still pins the exact bytes, but the `git_commit` tag won't
+   point at a commit containing them.
+3. Runs `swegemma eval` as a subprocess against a unique `results/<label>/`
+   dir.
+4. Appends a templated entry to `experiments/CHANGELOG.md` (hypothesis,
+   change, cohort, result, results dir, commit, MLflow link).
+
+Then, best-effort: logs one MLflow **parent run** (tags: `backend`, `env`,
+`fidelity`, `git_commit`, `git_dirty`, `config_hash`, `hypothesis`; metrics:
+`resolution_rate` for `fidelity=official-model` runs or
+`proxy_resolution_rate` otherwise — never the same metric name, so a proxy
+score can't be accidentally sorted against a real one; per-repo rates;
+patch-generation/timeout rates) with one nested **child run per task** (tags:
+`instance_id`/`repo`/`resolved`; metrics: tool calls, turns, duration, patch
+size, test exit code). Trace + test-output log artifacts are attached only
+for failed/errored tasks — routine successful-task traces stay on local disk
+only. If MLflow logging fails for any reason (server down, network, etc.),
+the run and CHANGELOG entry above are entirely unaffected; a warning prints
+to stderr and `run_evaluation.py`'s exit code still reflects `swegemma eval`.
+
+For a results dir produced elsewhere (e.g. downloaded after a rented-GPU run,
+or a local run executed with an unreachable MLflow server), ingest it after
+the fact without re-running the eval:
+
+```
+python3 devtools/mlflow/ingest_results.py \
+  --results-dir results/<label> --label <label> \
+  --submission-snapshot experiments/<label>/submission_snapshot \
+  --backend gemma-4-31b-qat --env rented-gpu --fidelity official-model
+```
+
+Both scripts share `devtools/mlflow/mlflow_logging.py`. MLflow's tracking URI
+defaults to `http://localhost:5001`. **Gotcha already fixed in this code**: a
+freshly-created MLflow experiment can default to a local-filesystem artifact
+root the client can't write to (varies by server config) — both scripts
+explicitly create new experiments with a proxied `mlflow-artifacts:` location
+to avoid this.
+
+### Verified (2026-09-29)
+
+Ran `run_evaluation.py` against the same 4-task `--skip-agent-patch` smoke
+cohort from the step-1 structural test. Confirmed via the MLflow REST API:
+parent run `FINISHED` with all 3 expected artifacts attached
+(`config_snapshot/`, `summary.json`, `task_results.jsonl`); 4 child runs
+`FINISHED` with correct tags/metrics; the checked child run (unresolved) had
+its trace + test-output log correctly attached per the fail-only artifact
+policy. `experiments/CHANGELOG.md` entry and MLflow link both correct. See
+that file for the one bug this test caught and the fix.
