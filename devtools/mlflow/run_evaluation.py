@@ -57,6 +57,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-time-minutes", type=float, default=None)
     p.add_argument("--concurrency", type=int, default=None)
     p.add_argument("--display", default="quiet")
+    p.add_argument("--models-yaml", default=None,
+                    help="Custom model registry override, e.g. devtools/models-ollama-e4b.yaml "
+                         "to redirect the declared model alias to a local stand-in")
 
     p.add_argument("--backend", required=True, help="e.g. stand-in-e4b, gemma-4-31b-qat")
     p.add_argument("--env", required=True, choices=["local-mac", "rented-gpu", "kaggle-notebook"])
@@ -145,6 +148,8 @@ def run_swegemma_eval(args: argparse.Namespace, results_dir: Path) -> int:
         cmd += ["--max-time-minutes", str(args.max_time_minutes)]
     if args.concurrency is not None:
         cmd += ["--concurrency", str(args.concurrency)]
+    if args.models_yaml is not None:
+        cmd += ["--models-yaml", args.models_yaml]
 
     print(f"[run_evaluation] {' '.join(cmd)}", file=sys.stderr)
     proc = subprocess.run(cmd)

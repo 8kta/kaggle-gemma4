@@ -137,3 +137,74 @@ Entry format:
 - **Repo breakdown**: `fastapi/fastapi` 0/67, `psf/requests` 3/13,
   `Textualize/rich` 1/48, `encode/httpx` 0/1 (only 1 httpx task in the public
   set total).
+
+## 2026-09-29 — 2026-09-29_proxy-sanity
+- Hypothesis: Sanity check: does gemma4:e4b via Ollama actually drive a real Container-A agent loop through swegemma eval, using the models.yaml alias override?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_proxy-sanity/`
+- Commit: `fe1e411cea8071a1253cada571d6d764bdf6d997` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/e3486875ae6e4a9a9731450941bc37d1
+
+## 2026-09-29 — 2026-09-29_proxy-sanity
+- Hypothesis: Sanity check: does gemma4:e4b via Ollama actually drive a real Container-A agent loop through swegemma eval, using the models.yaml alias override (now covering main_lora/tool_lora too)?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_proxy-sanity/`
+- Commit: `fe1e411cea8071a1253cada571d6d764bdf6d997` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/07c58c5020ce4361856e9c7ccda9ff20
+
+## 2026-09-29 — 00_baseline-proxy-model
+- Hypothesis: Mac proxy-model baseline (plan step 3): real Container-A agent loop driven by gemma4:e4b via Ollama across the same 4-repo smoke cohort used for the structural baseline, to catch orchestration/tool-calling bugs. Not a solution-quality signal (logged as proxy_resolution_rate).
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, requests_7505, rich_4070, httpx_3672, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/4
+- Results dir: `results/00_baseline-proxy-model/`
+- Commit: `fe1e411cea8071a1253cada571d6d764bdf6d997` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/070aa0414c9b42239d444f4ad57755bd
+
+## 2026-09-29 — 00_baseline-proxy-model
+- Hypothesis: Mac proxy-model baseline, retried at --concurrency 1 after concurrency=2 caused all 4 tasks to hit the 5-min session timeout with almost no progress (3-4 tool calls each) -- testing whether Ollama serializes/contends under concurrent requests, unlike the model-free structural baseline which handled concurrency=3 fine.
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, requests_7505, rich_4070, httpx_3672, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/4
+- Results dir: `results/00_baseline-proxy-model/`
+- Commit: `fe1e411cea8071a1253cada571d6d764bdf6d997` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/af0b387e4a684deb8c14d05222e59ee9
+
+### Analysis addendum — root cause found, concurrency hypothesis disproven
+- Concurrency wasn't the cause: `--concurrency 1` (fully serial) produced the
+  *same* 4/4 timeout pattern as `--concurrency 2`, including the same
+  `fastapi_15661` task that had succeeded in 189.55s (3 tool calls, real
+  patch submitted) during the isolated sanity test just before this. Same
+  task, same model, same concurrency — different outcome. Not a contention
+  artifact.
+- **Real cause, found in `results/00_baseline-proxy-model/traces/trace_requests_7505.json`**:
+  the model repeats near-identical reasoning across many consecutive steps
+  ("The user wants to modify the `requests` library to add `hasattr`
+  checks..." restated with minor rewording across 8+ of the 13 total steps)
+  instead of acting decisively. `final_metrics`: 64,162 prompt tokens with
+  49,686 (77%) cached — so KV-cache reuse is working and prefill isn't the
+  bottleneck — but only 6,440 completion tokens across 13 steps, i.e. a lot
+  of that generation budget goes to restating the same plan rather than
+  making progress. One step tried `read_file` on a directory
+  (`src/requests/`), got an error, and the model visibly struggled to
+  recover efficiently afterward.
+- **Practical implication for future proxy-model use**: `gemma4:e4b`'s
+  failure mode here is a reasoning loop, not raw latency — matches exactly
+  what the harness's own continuation-nudge design anticipates ("Do NOT
+  repeat your prior reasoning in thought" per HARNESS_README §5.3), so the
+  fix path is prompt discipline / stronger anti-repetition steering for
+  small models, not a bigger time budget alone (though `--max-time-minutes 5`
+  is almost certainly too tight for this model regardless — 0/5 attempts
+  across both runs completed within it). Out of scope for this step-3
+  checkpoint; relevant for step 6 (prompt engineering) if `gemma4:e4b`
+  continues to be used for local orchestration debugging.
+- **Net assessment of the proxy-model wiring itself**: fully validated
+  independent of this finding — the isolated sanity run proved the
+  `models.yaml` alias-override mechanism, Ollama routing, and real
+  Container-A tool-calling all work correctly end-to-end (see the
+  `2026-09-29_proxy-sanity` entry above). This session's finding is about
+  the *model's* behavior under budget pressure, not the harness wiring.

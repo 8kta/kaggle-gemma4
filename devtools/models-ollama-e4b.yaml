@@ -1,0 +1,31 @@
+# Redirects the competition's required model alias to a local Ollama stand-in
+# for proxy-model baseline runs (plan step 3 / "local-loop" debugging).
+# Dev tooling only — never referenced from submission/ (the real submission's
+# agent.yaml keeps declaring gemma-4-31b-it-qat-w4a16-ct unchanged; this file
+# only overrides what that alias resolves to for *this local eval run*, via
+# `swegemma eval --models-yaml devtools/models-ollama-e4b.yaml`).
+#
+# Requires: `ollama pull gemma4:e4b` and `ollama serve` (or the Ollama app)
+# running locally on the default port.
+#
+# sample_submission/agent.yaml declares `adapter: main_lora` (root agent) and
+# sub_agents/code_analyzer.yaml declares `adapter: tool_lora` — these are
+# separate registry lookups from the base model alias. Ollama can't actually
+# apply LoRA weights dynamically the way vLLM does, so for stand-in testing
+# both adapter aliases are routed to the same base Ollama model too, rather
+# than modifying the submission being tested. This will not reflect any
+# LoRA-specific behavior — it's purely to keep the agent-loop plumbing (tool
+# calling, orchestration, sub-agent delegation) exercisable end-to-end.
+models:
+  gemma-4-31b-it-qat-w4a16-ct:
+    path: openai/gemma4:e4b
+    api_base: http://localhost:11434/v1
+    api_key: EMPTY
+  main_lora:
+    path: openai/gemma4:e4b
+    api_base: http://localhost:11434/v1
+    api_key: EMPTY
+  tool_lora:
+    path: openai/gemma4:e4b
+    api_base: http://localhost:11434/v1
+    api_key: EMPTY

@@ -186,17 +186,46 @@ carry "free credit" independent of agent quality in this environment.
 > killed early (caught this after a first attempt silently stopped at 9/129
 > tasks). Use one or the other, not both.
 
-### Mac proxy-model baseline — model ready, run not yet executed
+### Mac proxy-model baseline — wiring validated, model needs more budget
 
-Pulled `gemma4:e4b` via Ollama (9.6 GB) — this is a genuine small Gemma 4
-variant (not the "uncensored-heretic" unofficial fine-tunes already present
-locally, which wouldn't validate real tool-calling behavior against the
-harness's `tool_call_parser=gemma4`/`reasoning_parser=gemma4` expectations).
-Still needed: point `swegemma`'s model registry at Ollama's OpenAI-compatible
-endpoint (`http://localhost:11434/v1`) instead of the real vLLM server, and
-run a real Container-A agent loop (no `--skip-agent-patch`) against the smoke
-cohort to validate orchestration/tool-calling — logged as
-`proxy_resolution_rate`, not `resolution_rate`.
+Pulled `gemma4:e4b` via Ollama (9.6 GB) — a genuine small Gemma 4 variant
+(not the "uncensored-heretic" unofficial fine-tunes already present locally,
+which wouldn't validate real tool-calling behavior against the harness's
+`tool_call_parser=gemma4`/`reasoning_parser=gemma4` expectations). Confirmed
+`tools` capability and real OpenAI-format tool-call output via a direct
+`/v1/chat/completions` test before wiring it in.
+
+`devtools/models-ollama-e4b.yaml` overrides the competition's required model
+alias (`gemma-4-31b-it-qat-w4a16-ct`, plus the `main_lora`/`tool_lora`
+adapter aliases `sample_submission/agent.yaml` references) to route to
+Ollama instead of a real vLLM server — `sample_submission/agent.yaml` itself
+is never modified. Pass it via `run_evaluation.py --models-yaml
+devtools/models-ollama-e4b.yaml`.
+
+```
+python3 devtools/mlflow/run_evaluation.py --label <name> \
+  --submission-dir downloads/kagglehub/competitions/gemma-4-developer-agent/sample_submission \
+  --models-yaml devtools/models-ollama-e4b.yaml \
+  --task-ids fastapi_15661 --sandbox docker \
+  --max-tool-calls 15 --max-turns 10 --max-time-minutes 5 \
+  --backend stand-in-e4b --env local-mac --fidelity proxy-model --cohort smoke \
+  --hypothesis "..."
+```
+
+**Wiring fully validated**: an isolated single-task run produced 3 real tool
+calls, 6 LLM turns, and a real 550-byte submitted patch in 189s — proving
+the alias-override + Ollama routing + Container-A tool-calling all work
+end-to-end. **But at scale (4-task smoke cohort, both `--concurrency 1` and
+`--concurrency 2`) every task timed out at the 5-minute budget** — root
+cause isolated via the trace files: `gemma4:e4b` tends to fall into
+reasoning loops, restating near-identical analysis across many consecutive
+turns instead of acting decisively (not a caching/latency problem — cache
+hit rate was 77%). Full analysis in `experiments/CHANGELOG.md`'s
+`00_baseline-proxy-model` entries. This is itself the kind of
+orchestration/tool-calling finding this baseline exists to surface, per the
+plan — not a benchmark number to report. Larger budgets and/or
+anti-repetition prompt steering (step 6) would likely be needed before this
+stand-in model is useful for real orchestration debugging at scale.
 
 ### Official GPU baseline — deferred
 
