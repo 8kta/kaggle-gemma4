@@ -273,3 +273,36 @@ steering, explicit exploration guidance, `edit_file` usage examples) as the
 highest-leverage next step for this model — not graph-tool/retrieval
 investment. Sample size is small (1 task per repo) — full write-up with
 caveats in `experiments/CHANGELOG.md`.
+
+## Agent architecture (plan step 6)
+
+`submission/` now has a real `agent.yaml` + `prompts/system.md` +
+`configs/sampling.yaml` — single `LlmAgent`, no sub-agents. The prompt
+directly targets step 5's evidenced failures: anti-repetition steering,
+explicit `run_command`-for-exploration guidance, worked `edit_file`
+old_string/new_string examples.
+
+**Caught a real packaging bug immediately**: `.gitkeep` placeholders left
+over from initial scaffolding (`submission/adapters/`, `skills/`,
+`sub_agents/`) have no file extension, which violates the harness's
+allowlist — `Sandbox execution error: File has disallowed extension ''`.
+This would have broken a real Kaggle submission too; removed.
+
+Re-tested the exact two step-5 failure cases with a generous 15-min budget
+(vs. the 5-min sanity budget, to separate "prompt is bad" from "budget is
+too tight"): `fastapi_15661`'s Navigation failure looks **fixed** (real
+exploration happened this time — read multiple files, ran a script,
+investigated a real error — though this specific task is unusually hard and
+still didn't finish in budget). `rich_4070`'s `edit_file` parameter-swap
+mistake **did not recur**, but a *different* `edit_file` failure surfaced
+("old_string too large/complex"), and getting stuck on it triggered the
+same repetitive-restatement pattern again. Neither task completed within
+budget. Full trace-level analysis in `experiments/CHANGELOG.md`.
+
+**Architecture decision: single-agent for now, sub-agent ablation
+deferred.** The Code Analyzer sub-agent's value proposition (reducing
+`read_file` context noise) doesn't address the currently-dominant failure
+mode (`edit_file` mechanics, residual repetition under difficulty) — running
+the full ablation matrix now would likely just measure the same operational
+noise across all variants rather than discriminate between them. Revisit
+once step 7's prompt iteration clears the current operational issues.

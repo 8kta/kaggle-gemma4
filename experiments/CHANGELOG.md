@@ -280,3 +280,86 @@ Entry format:
 - Results dir: `results/00_baseline-proxy-model/` (same as step 3, no new
   run).
 - Commit: see below.
+
+## 2026-09-29 — 2026-09-29_step6-single-agent-v1
+- Hypothesis: Does our new submission/agent.yaml compile correctly, and does the rewritten system.md (anti-repetition steering + explicit run_command exploration guidance + edit_file usage examples) fix fastapi_15661's step-5 Navigation failure ('I cannot list the files...')? Using a generous 15-min budget (vs the 5-min sanity budget) to isolate prompt-quality from budget-too-tight.
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step6-single-agent-v1/`
+- Commit: `139ee5ac44e247845bf5281e8f3de90f6021796a` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/a4ecf979ae73482494194c032097b89a
+
+## 2026-09-29 — 2026-09-29_step6-single-agent-v1
+- Hypothesis: Retry after removing disallowed .gitkeep placeholders from submission/adapters,skills,sub_agents (caused a packaging validation error, not a model issue). Does our new submission/agent.yaml compile correctly, and does the rewritten system.md fix fastapi_15661's step-5 Navigation failure?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step6-single-agent-v1/`
+- Commit: `139ee5ac44e247845bf5281e8f3de90f6021796a` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/a2928d14ca844e3fb27ca1742d6f1f29
+
+## 2026-09-29 — 2026-09-29_step6-single-agent-rich
+- Hypothesis: Does the new edit_file usage guidance in system.md fix rich_4070's step-5 failure (correct fix identified, but old_string/new_string parameters swapped)?
+- Change: `swegemma eval --sandbox docker` against task(s) rich_4070, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step6-single-agent-rich/`
+- Commit: `139ee5ac44e247845bf5281e8f3de90f6021796a` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/6f1dc181c366401ba085ee443b44dfdb
+
+### Analysis addendum (plan step 6 — architecture design)
+- **Real packaging bug found and fixed**: the first `2026-09-29_step6-single-agent-v1`
+  attempt failed immediately with `Sandbox execution error: File has
+  disallowed extension '': adapters/.gitkeep` — the `.gitkeep` placeholders
+  created back in the initial project scaffolding (`submission/adapters/`,
+  `skills/`, `sub_agents/`) violate the harness's own file-extension
+  allowlist. This would have broken a **real Kaggle submission** too, not
+  just local testing — worth having caught now. Removed all three; empty
+  dirs are fine untracked by git since they'll get real content in later
+  steps.
+- **Built `submission/agent.yaml` + `submission/prompts/system.md`** (single
+  `LlmAgent`, no sub-agents — see architecture decision below), directly
+  targeting step 5's evidenced failures: explicit anti-repetition steering,
+  explicit `run_command`-for-exploration guidance for vague/PR-style
+  problem statements, and worked `edit_file` old_string/new_string usage
+  examples. `submission/configs/sampling.yaml` copied unchanged from
+  `sample_submission` (already sensible: temp 0.2, 4096 thinking budget,
+  16384 max output). No `eval_config.yaml` — relying on the harness's
+  generous defaults (100 tool calls / 500 turns / 60 min) rather than
+  `sample_submission`'s artificially tight demo values (1 min).
+- **Re-tested the exact two step-5 failure cases with a generous 15-min
+  budget** (vs. the 5-min sanity budget that couldn't distinguish
+  "prompt is bad" from "budget is too tight"):
+  - `fastapi_15661` (previously: Navigation failure, "I cannot list the
+    files..."): **fixed**. This run explored `publish.yml`, `pyproject.toml`,
+    `README.md`, `scripts/add_latest_release_date.py`, ran a script, and
+    investigated a real `ModuleNotFoundError` — genuine incremental
+    progress, not stuck. Still ran out of the 15-turn budget without
+    submitting; this specific task (a vague PR-template with no concrete
+    bug, and previously found in step 1 to have its own separate
+    `scripts.prepare_release` collection-error quirk) looks like a
+    consistently hard/atypical task, not a clean prompt-quality signal.
+  - `rich_4070` (previously: Operational failure, `edit_file`
+    old_string/new_string swapped): **partially fixed, new issue found**.
+    The swap mistake did not recur. Also self-corrected a wrong file-path
+    guess (404 on `logging.py` → retried `rich/logging.py` successfully).
+    But hit a *different* `edit_file` failure this time — "old_string
+    context was too large or complex... error about missing mandatory
+    parameters" — and once blocked on that, fell back into the same
+    repetitive-restatement pattern from step 5 (many turns re-stating
+    "I have already read `rich/logging.py` and identified..." without a
+    successful edit). Timed out at 15 min, 8 tool calls, no patch.
+- **Architecture decision: single-agent, sub-agent ablation deferred.**
+  The Code Analyzer sub-agent's value proposition is keeping `read_file`
+  noise out of the root agent's context — but our currently-dominant
+  failure mode (per the two re-tests above) is `edit_file` mechanics and
+  residual repetition-under-difficulty, not context clutter from file
+  exploration. Running the full single/+analyzer/+verifier/+both ablation
+  matrix now would likely just measure the same operational noise across
+  all four variants rather than discriminating between them. Proceeding
+  with single-agent as the working architecture; revisiting the ablation
+  later if Navigation/context-clutter failures become dominant once the
+  current operational issues are addressed (plan step 7).
+- Results dirs: `results/2026-09-29_step6-single-agent-v1/`,
+  `results/2026-09-29_step6-single-agent-rich/`.
