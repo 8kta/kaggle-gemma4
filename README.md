@@ -14,6 +14,7 @@ submission/       # Competition files only — this is what gets zipped as submi
   sub_agents/     # sub-agent / AgentTool YAML configs
   skills/         # ADK Skill directories (SKILL.md + scripts/resources)
   adapters/       # LoRA adapter directories (adapter_config.json + adapter_model.safetensors)
+devtools/setup_env.sh  # Reproducible local environment setup (see below)
 devtools/mlflow/  # Host-side MLflow wrappers (run_evaluation.py, ingest_results.py) — dev-only, never imported by submission/
 experiments/      # CHANGELOG.md + per-run config snapshots
 results/          # Native swegemma eval output (--results-dir target), gitignored
@@ -27,63 +28,64 @@ and step 11 for the isolation checks that enforce this before packaging.
 
 ## Environment setup (plan step 1)
 
-Requires **Python 3.13** (matches the sandbox container — `swegemma` won't
-install on 3.11/3.12). Everything below assumes `source .venv/bin/activate`
-first.
+Requires **Python 3.13** on PATH (matches the sandbox container — `swegemma`
+won't install on 3.11/3.12), Docker running, and Kaggle credentials already
+configured (`python3 -c "import kagglehub; kagglehub.login()"` once per
+machine — prompts for an API token from kaggle.com/settings → API, writes it
+to `~/.kaggle/access_token`; never paste the token in chat/logs).
 
 ```
-python3.13 -m venv .venv
-source .venv/bin/activate
-pip install kagglehub
+./devtools/setup_env.sh
 ```
 
-The venv's `activate` script has a project-specific line appended exporting
-`KAGGLEHUB_CACHE` so all kagglehub downloads land in `downloads/` (gitignored)
-instead of the global `~/.cache/kagglehub`.
+This is idempotent — re-running it skips whatever's already cached/installed.
+It does, in order:
 
-**Kaggle auth**: `python3 -c "import kagglehub; kagglehub.login()"` — prompts
-for an API token (from kaggle.com/settings → API), writes it to
-`~/.kaggle/access_token`. Do this once per machine; never paste the token in
-chat/logs.
+1. Creates `.venv` on Python 3.13 (fails loudly if `python3.13` isn't found).
+2. Installs `kagglehub`, appends a `KAGGLEHUB_CACHE` export to
+   `.venv/bin/activate` so all kagglehub downloads land in `downloads/`
+   (gitignored) instead of the global `~/.cache/kagglehub`.
+3. Verifies Kaggle auth (`kagglehub.whoami()`).
+4. Downloads the competition dataset (`kagglehub.competition_download(...)`)
+   → `downloads/kagglehub/competitions/gemma-4-developer-agent/` (~21 GB:
+   tasks, snapshots, graphs, embeddings, wheels, docker specs, sample_submission).
+5. Downloads the **harness wheelhouse** and installs the 4 pure-Python wheels
+   from it. `swegemma`/`adk_submission`/`adk_eval_core` are **not on PyPI and
+   not in the competition dataset** — not mentioned anywhere in
+   `HARNESS_README.md`/`Overview`/`Data` either. They only surface via the
+   organizer's getting-started Kaggle notebook
+   (`kaggle kernels pull ryanholbrook/getting-started-gemma-4-developer-agent`),
+   whose first cell references the Kaggle dataset handle
+   `metric/gemma-4-developer-agent-wheelhouse`
+   (`kagglehub.dataset_download('metric/gemma-4-developer-agent-wheelhouse')`).
+   That dataset (~827 MB, currently version 25 — the script resolves whatever
+   the *current* version is at install time rather than hardcoding it) has
+   ~41 wheels; most (`vllm`, `bitsandbytes`, `flashinfer`, `apache_tvm_ffi`,
+   etc.) are CUDA/`manylinux_x86_64`-only, for real vLLM serving on rented GPU
+   hardware — not needed on the Mac. The four installed are pure Python
+   (`py3-none-any`): `adk_eval_core`, `adk_submission`, `swegemma`, `google_adk`.
+6. Installs every remaining transitive dependency pinned in
+   `requirements-lock.txt` (regenerate via the command in that file's header
+   after any deliberate dependency change).
+7. Builds `swebench-sandbox:latest` from the dataset's `docker/Dockerfile.sandbox`
+   if it doesn't already exist locally.
 
-**Competition dataset**: `kagglehub.competition_download('gemma-4-developer-agent')`
-→ `downloads/kagglehub/competitions/gemma-4-developer-agent/` (~21 GB: tasks,
-snapshots, graphs, embeddings, wheels, docker specs, sample_submission).
+### Verified (2026-09-29)
 
-**Harness packages (`swegemma`, `adk_submission`, `adk_eval_core`)**: these are
-**not on PyPI** and **not in the competition dataset** — they're not mentioned
-anywhere in `HARNESS_README.md`/`Overview`/`Data` either. They live in a
-separate Kaggle *dataset* (a "wheelhouse") that only surfaces by pulling the
-organizer's getting-started notebook source:
-
-```
-kaggle kernels pull ryanholbrook/getting-started-gemma-4-developer-agent -p downloads/kaggle-kernels
-```
-
-That notebook's first cell references
-`/kaggle/input/datasets/metric/gemma-4-developer-agent-wheelhouse` — i.e. the
-Kaggle dataset handle `metric/gemma-4-developer-agent-wheelhouse`:
-
-```python
-import kagglehub
-kagglehub.dataset_download('metric/gemma-4-developer-agent-wheelhouse')
-```
-
-That wheelhouse (~827 MB) contains ~41 wheels. Most (`vllm`, `bitsandbytes`,
-`flashinfer`, `apache_tvm_ffi`, etc.) are CUDA/`manylinux_x86_64`-only — for
-the real official-model vLLM serving on rented GPU hardware, not needed on the
-Mac. The four we actually need are pure-Python (`py3-none-any`):
-
-```
-pip install \
-  downloads/kagglehub/datasets/metric/gemma-4-developer-agent-wheelhouse/versions/<N>/adk_eval_core-0.1.0-py3-none-any.whl \
-  downloads/kagglehub/datasets/metric/gemma-4-developer-agent-wheelhouse/versions/<N>/adk_submission-0.2.11-py3-none-any.whl \
-  downloads/kagglehub/datasets/metric/gemma-4-developer-agent-wheelhouse/versions/<N>/swegemma-0.2.7-py3-none-any.whl \
-  downloads/kagglehub/datasets/metric/gemma-4-developer-agent-wheelhouse/versions/<N>/google_adk-1.36.1-py3-none-any.whl
-```
-
-This installs the `swegemma` CLI into the venv (`swegemma eval ...`).
-
-**Docker**: needs to be running for `--sandbox docker` (native `arm64` on
-Apple Silicon; falls back to `--platform linux/amd64` emulation only if a
-repo's wheels are x86_64-only — see `agent-ideas/claude-idea.md` step 1).
+- `swebench-sandbox:latest` builds and runs **natively on `arm64`** — no
+  `--platform linux/amd64` emulation needed for the base image.
+- Ran `swegemma eval --sandbox docker --skip-agent-patch` (bypasses Phase 1 —
+  no model/vLLM server needed — and goes straight to Container B verification
+  with an empty patch) against one task per repo: `fastapi_15661`,
+  `requests_7505`, `rich_4070`, `httpx_3672`. All four: container spun up,
+  snapshot extracted, editable install + wheel resolution succeeded, pytest
+  ran to completion, `errors: 0` in `summary.json`, durations 3–20s. Two
+  (`fastapi`, `httpx`) hit expected pytest **collection** errors (missing
+  module / missing attribute) because the reference fix — which the test file
+  depends on — was deliberately not applied (`--skip-agent-patch`); this is
+  correct Fail-to-Pass behavior, not an infra problem. No wheel/architecture
+  errors surfaced for any of the four repos.
+- Still open: this only exercises Container B (`--skip-agent-patch` skips
+  Container A / the actual agent loop entirely). A true end-to-end run needs
+  either the real model on rented GPU or a local stand-in model — see plan
+  step 3 ("three baselines").
