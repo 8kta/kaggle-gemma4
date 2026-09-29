@@ -556,3 +556,39 @@ Entry format:
   task), and the **first explicit `submit_patch()` call** seen in any trace
   this project (all prior "successful" runs relied on the harness's
   automatic fallback capture). The v3 prompt fix continues to compound.
+
+## 2026-09-29 — 2026-09-29_step8-pytest-fix
+- Hypothesis: Replaced the soft 'never run bare pytest' framing with a mechanical pre-call check (literal yes/no on whether the pytest command string contains a .py path or -k/:: selector), mirroring the technique that fixed anti-repetition in step 7 round 2. Does this stop the bare 'pytest tests/' call seen on this exact task in the prior run?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-pytest-fix/`
+- Commit: `79d4524cae51017541652dec12a5fae176962843` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/83eb7ee211744408bb9818fc510b87f7
+
+### Analysis addendum — mechanical fix confirmed working
+- **Confirmed via full tool-call listing: zero `pytest`/`unittest` calls of
+  any kind this run** (`ls` → `read_file`×3 → `search_similar_code` →
+  `edit_file` → `ls scripts/` → `write_file(scripts/bump_version.py)` →
+  `run_command(python scripts/bump_version.py)` → `submit_patch()`). The
+  prior run's bare `pytest tests/` violation did not recur — the same
+  mechanical-check technique that fixed anti-repetition in step 7 round 2
+  (literal yes/no check on the command string, not a soft "don't do X")
+  worked again here.
+- **4th consecutive clean completion** (`error: null`), 513.14s (well under
+  budget), `agent_patch_size=3072` — a substantially larger, more
+  substantive patch than the 347-byte version from the same task two runs
+  ago. `test_exit_code=2` persists (same `scripts.prepare_release`
+  collection-error quirk documented since step 1 — a pre-existing harness/
+  task issue, not something either prompt change could fix).
+- **Secondary observation, not chased further**: with no obvious targeted
+  test available for this task, the agent skipped the Verify step
+  entirely rather than running anything resembling a broad sweep — a
+  reasonable trade-off given the new forbidden-pattern rule, but means
+  "Verify" isn't reliably happening when no clear test target exists. This
+  specific task (`fastapi_15661`) has been atypically hard throughout the
+  whole project (vague problem statement, no clear test, collection-error
+  quirk) — plausibly more about task difficulty than a new prompt defect.
+  Candidate for a future round: explicit guidance on what to do when no
+  targeted test is obvious (e.g. write and run a small inline assertion
+  instead of skipping verification outright).

@@ -42,11 +42,12 @@ Each turn should either take a concrete tool action or, if you were interrupted 
 - Prefer several small, focused `edit_file` calls over one large rewrite — this also avoids response truncation on large payloads.
 
 ## Run Targeted Tests Only (Existing Tests May Be Broken)
-- **Run ONLY Targeted Tests**: Run only the specific test file or test method directly verifying the bug or feature you modified (e.g. `pytest tests/test_target.py -k test_feature`).
-- **Be Aware That Existing Tests May Be Broken**: Many repositories contain pre-existing test breakages, missing test data fixtures, or environment import errors unrelated to your task.
-- **Do NOT Attempt to Fix Existing Tests**: If an existing test fails due to pre-existing repository issues, IGNORE IT. Never spend turns attempting to repair pre-existing test failures, create test stubs, or alter test code.
-- **STRICT RULE: NEVER Run Bare Pytest or Full-Repo Sweeps**: NEVER run bare `pytest`, `pytest .`, `python3 -m unittest discover`, or full-repo test suites without specifying a target file. Full test suites take several minutes, cause catastrophic timeouts, and exhaust your turn and time budgets.
-- If you need to locate the test file, find it explicitly with `find tests -name "*<name>*.py"` instead of running the test runner across the repo.
+**Mandatory check before every `pytest`/`unittest` command**: before calling `run_command` with anything containing `pytest` or `unittest`, look at the exact command string you are about to send and check: does it contain a specific test file path ending in `.py`, or a `-k`/`::` test selector? This is a literal yes/no check on the command string, not a judgment call.
+- If **yes** (e.g. `pytest tests/test_target.py`, `pytest tests/test_target.py -k test_feature`, `pytest tests/test_target.py::TestClass::test_method`): allowed, proceed.
+- If **no** (the command is `pytest`, `pytest .`, `pytest tests/`, `pytest tests`, any bare directory or no-argument form, or `python3 -m unittest discover`): **forbidden — do not send this command.** Add a specific `.py` file path before calling. If you don't know the exact test file yet, find it first with `find tests -name "*<name>*.py"` (a `find`, not a test-runner invocation), then re-do this check on the corrected command.
+- This check applies every time, including re-verification after a fix — do not let a previously-correct targeted command drift into a bare one on a later attempt.
+
+Why this matters: full test suites take several minutes, cause catastrophic timeouts, and exhaust your turn and time budgets — and many repositories contain pre-existing test breakages, missing test data fixtures, or environment import errors unrelated to your task, so a bare run will show unrelated failures that are not yours to fix. If an existing test fails due to pre-existing repository issues, ignore it — never spend turns attempting to repair pre-existing test failures, create test stubs, or alter test code.
 
 ## Immediate Patch Submission
 Once your targeted test passes:

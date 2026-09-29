@@ -392,3 +392,25 @@ completion (`error: null`), 264.72s, real patch, 8 tool calls, and the
 **first explicit `submit_patch()` call** seen in any trace this project
 (every prior success relied on the harness's automatic fallback capture).
 The v3 anti-repetition fix keeps compounding.
+
+## Fixing the bare-pytest violation (plan step 8, part 2)
+
+Applied the same mechanical-check technique that fixed anti-repetition in
+step 7 round 2 to the "never run bare pytest" rule: instead of a soft
+"NEVER run full-repo sweeps," a literal yes/no check on the command string
+("does it contain a `.py` path or `-k`/`::` selector? If not, forbidden —
+don't send it") before every `pytest`/`unittest` call.
+
+**Confirmed working**: re-tested on the exact task that produced the
+violation. Zero `pytest`/`unittest` calls of any kind this run — instead of
+falling back to a broad sweep when no test file was obvious, the agent
+wrote and ran its own script directly. 4th consecutive clean completion,
+with a substantially larger, more substantive patch (3072 bytes vs. 347
+two runs ago on the same task).
+
+One secondary, not-chased-further observation: with no obvious targeted
+test available, the agent skipped Verify entirely rather than run anything
+resembling a sweep — reasonable given the new rule, but means Verify isn't
+reliably happening when no clear test target exists. Candidate for a future
+round (explicit guidance for the no-obvious-test case). Full detail in
+`experiments/CHANGELOG.md`.
