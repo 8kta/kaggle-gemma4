@@ -84,3 +84,56 @@ Entry format:
 - Results dir: `results/2026-09-29_wrapper-smoke/`
 - Commit: `58194788c7a4a8858b7070b660877099743e4d4b` (dirty worktree at run time)
 - MLflow: http://localhost:5001/#/experiments/9/runs/749cdfb2c02f42d5a3a1020e5bb821c2
+
+## 2026-09-29 — 00_baseline-structural
+- Hypothesis: Validate the full harness pipeline (snapshot extraction, editable install, wheel resolution, pytest execution) across all 129 tasks natively on arm64, not just the 4-task sample tested in steps 1-2. Establishes the Mac structural baseline per plan step 3.
+- Change: `swegemma eval --sandbox docker --skip-agent-patch` against the full task set, backend=none, env=local-mac, fidelity=structural.
+- Cohort: full-129
+- Result: proxy_resolution_rate=0.031, resolved=4/129
+- Results dir: `results/00_baseline-structural/`
+- Commit: `ad32741c65e05a84e7a4d1ea57e8f61264e4a607`
+- MLflow: http://localhost:5001/#/experiments/9/runs/9dad7e3c3a2b428699bc402bcd8e27d9
+
+### Analysis addendum (resource profile + findings, per step 3)
+- **Wall clock**: 19.5 min for all 129 tasks at `--concurrency 3` (07:57:39 →
+  08:17:10). Sum of per-task durations (serial-equivalent) is 2639.6s (~44
+  min) — concurrency-3 gave ~2.25x speedup, short of the ideal 3x due to
+  container overhead and two long-tail stragglers (see below). **This is
+  structural-only timing (no model calls) — not a proxy for real-agent
+  runtime**, which will be dominated by inference/tool-call latency, not
+  container setup. Don't compare this number against a future real-agent
+  projected runtime.
+- **Exit code breakdown** (`test_exit_code` across all 129):
+  `{2: 70, 1: 52, 0: 4, 137: 2, 124: 1}`. `errors: 0` in `summary.json` only
+  counts harness-level errors — it does NOT surface timeouts (124) or
+  OOM-kills (137), both of which showed up here. Don't rely on `errors: 0`
+  alone to mean "nothing went wrong."
+  - **Exit 2** (70 tasks, mostly `fastapi`): pytest collection errors —
+    expected under `--skip-agent-patch` (test files reference code that only
+    exists after the fix).
+  - **Exit 1** (52 tasks): normal test failures — expected Fail-to-Pass
+    behavior.
+  - **Exit 124 / 137** (3 tasks, all `Textualize/rich`): `rich_4006` hit the
+    300s default command timeout; `rich_3772` and `rich_3480` were SIGKILL'd
+    (137), almost certainly the sandbox's 4GB RAM cap per HARNESS_README
+    §4.1. All three in one repo — `rich`'s test suite is the one most likely
+    to strain the resource-constrained sandbox even for a real agent run,
+    independent of model quality. Worth budgeting extra timeout/memory
+    margin for `rich` tasks specifically.
+- **Dataset-curation finding — 4 tasks resolve with zero code changes**:
+  `requests_7427`, `requests_7315`, `requests_7309`, `rich_3468` all pass
+  their full test suite (`test_exit_code=0`) with `agent_patch_size=0` under
+  `--skip-agent-patch`. Per `Data.md`'s own curation pipeline, the
+  Fail-to-Pass check (`base_commit` + `test_patch`, no fix, tests must fail)
+  should make this impossible — yet it happens for ~3.1% (4/129) of the
+  public task set in our environment. Cause not yet isolated (could be a
+  genuine curation gap, or a dependency-version difference between our
+  `/wheels` resolution and the original curation environment). **Practical
+  implication**: any future `resolution_rate`/`proxy_resolution_rate` should
+  be read as "X%, of which up to ~3.1% would resolve even with a fully
+  no-op agent" — these 4 tasks are candidates to exclude from the step-4
+  comparison/held-out cohorts since they add noise unrelated to agent
+  capability.
+- **Repo breakdown**: `fastapi/fastapi` 0/67, `psf/requests` 3/13,
+  `Textualize/rich` 1/48, `encode/httpx` 0/1 (only 1 httpx task in the public
+  set total).

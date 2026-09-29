@@ -159,3 +159,47 @@ parent run `FINISHED` with all 3 expected artifacts attached
 its trace + test-output log correctly attached per the fail-only artifact
 policy. `experiments/CHANGELOG.md` entry and MLflow link both correct. See
 that file for the one bug this test caught and the fix.
+
+## Baseline reproduction (plan step 3)
+
+### Mac structural baseline — done (2026-09-29)
+
+```
+python3 devtools/mlflow/run_evaluation.py --label 00_baseline-structural \
+  --submission-dir downloads/kagglehub/competitions/gemma-4-developer-agent/sample_submission \
+  --skip-agent-patch --sandbox docker --concurrency 3 \
+  --backend none --env local-mac --fidelity structural --cohort full-129 \
+  --hypothesis "..."
+```
+
+Full 129-task run (not just the 4-task sample from steps 1–2): 19.5 min wall
+clock at `--concurrency 3`, `errors: 0`. Full findings (exit-code breakdown,
+a resource-constraint pattern isolated to `rich`, and a dataset-curation
+finding — 4 tasks resolve with zero code changes) are in
+`experiments/CHANGELOG.md`'s `00_baseline-structural` entry — read that
+before interpreting any future resolution-rate number, since ~3.1% of tasks
+carry "free credit" independent of agent quality in this environment.
+
+> **Lesson learned**: don't combine the Bash tool's `run_in_background: true`
+> with a manual trailing `&` on the same command — the outer wrapper reports
+> "completed" almost immediately while the actual process gets orphaned and
+> killed early (caught this after a first attempt silently stopped at 9/129
+> tasks). Use one or the other, not both.
+
+### Mac proxy-model baseline — model ready, run not yet executed
+
+Pulled `gemma4:e4b` via Ollama (9.6 GB) — this is a genuine small Gemma 4
+variant (not the "uncensored-heretic" unofficial fine-tunes already present
+locally, which wouldn't validate real tool-calling behavior against the
+harness's `tool_call_parser=gemma4`/`reasoning_parser=gemma4` expectations).
+Still needed: point `swegemma`'s model registry at Ollama's OpenAI-compatible
+endpoint (`http://localhost:11434/v1`) instead of the real vLLM server, and
+run a real Container-A agent loop (no `--skip-agent-patch`) against the smoke
+cohort to validate orchestration/tool-calling — logged as
+`proxy_resolution_rate`, not `resolution_rate`.
+
+### Official GPU baseline — deferred
+
+Needs rented NVIDIA hardware and real spend; out of scope to set up without
+explicit go-ahead. Current plan: the user will run this via Kaggle notebooks
+directly rather than this repo's local tooling.
