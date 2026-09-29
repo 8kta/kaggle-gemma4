@@ -251,3 +251,25 @@ prompt-dev/comparison (official model) → beats/matches champion on held-out
 → full 129-task milestone check. `experiments/CHAMPION.md` tracks the
 current best validated config — currently "none yet", since `submission/` is
 still the empty scaffold from step 0.
+
+## Failure-mode analysis (plan step 5)
+
+Classified the 4 proxy-model-baseline traces into the plan's four failure
+categories (Navigation / Reasoning / Operational / Constraint) — the
+structural baseline can't be used for this since `--skip-agent-patch` means
+no real agent reasoning ever happened there. Result, with all 4 tasks having
+timed out without submitting a patch: **3/4 Operational** (2 reasoning
+loops — same pattern found in `requests_7505` during step 3, now also seen
+in `httpx_3672`; 1 tool-call parameter error in `rich_4070`), **1/4
+Navigation** (`fastapi_15661` — model didn't realize it could explore via
+`run_command`, compounded by a vague problem statement), **0/4** clear
+Reasoning-quality or Constraint failures.
+
+**Key takeaway**: this stand-in model never gets far enough for a
+"right file, wrong logic" (Reasoning) failure to even become observable —
+it's blocked at the Operational layer first. Per the plan's own
+category→fix mapping, that points at prompt-level fixes (anti-repetition
+steering, explicit exploration guidance, `edit_file` usage examples) as the
+highest-leverage next step for this model — not graph-tool/retrieval
+investment. Sample size is small (1 task per repo) — full write-up with
+caveats in `experiments/CHANGELOG.md`.

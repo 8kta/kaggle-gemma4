@@ -232,3 +232,51 @@ Entry format:
   `known_anomalous_task_caveats_by_cohort`.
 - Results dir: N/A.
 - Commit: see below.
+
+## 2026-09-29 — Analyze failure modes (plan step 5)
+- Hypothesis: N/A — analysis of already-collected data, not a new eval
+  iteration. Mined the 4 proxy-model-baseline traces
+  (`results/00_baseline-proxy-model/traces/`) for the four failure
+  categories from the plan (Navigation / Reasoning / Operational /
+  Constraint). Note: the structural baseline (`--skip-agent-patch`) can't be
+  used for this — no real agent reasoning/tool-calling happened there, so
+  its failures aren't classifiable into these categories at all.
+- Change: none — pure analysis.
+- Cohort: smoke (the same 4-task cohort from the proxy-model baseline; only
+  1 sample per repo, so per-repo conclusions here are illustrative, not
+  statistically meaningful — a real repo-level breakdown needs a
+  larger/completed cohort).
+- Result — classification (all 4 tasks timed out at 5 min without
+  submitting a patch, so every failure here is "didn't finish" rather than
+  "finished with the wrong fix"):
+  - **`fastapi_15661` — Navigation**: "I cannot list the files in the
+    repository directory structure" — the model didn't recognize it could
+    just run `ls`/`find` via `run_command`; combined with a genuinely vague
+    problem statement ("👷 Automate release preparation", not a concrete bug
+    report). Never figured out *where* to look.
+  - **`rich_4070` — Operational (tool-call error)**: correctly identified
+    the right fix in principle (defer imports via `TYPE_CHECKING` to reduce
+    import time) but called `edit_file` with `old_string`/`new_string`
+    swapped — a mechanical tool-invocation mistake, not a reasoning failure.
+  - **`httpx_3672` — Operational (reasoning loop)**: near-identical
+    restated analysis across steps 5/6/8/9 instead of acting — same pattern
+    already found in `requests_7505` during step 3.
+  - **`requests_7505` — Operational (reasoning loop)**: see step-3 entry
+    above (77% cache hit rate, so not a latency/caching issue — genuinely
+    repeats the same plan instead of progressing).
+  - **Totals**: 3/4 Operational (2 reasoning-loop, 1 tool-syntax error),
+    1/4 Navigation, 0/4 Reasoning-quality, 0/4 Constraint.
+  - **Key finding**: with this stand-in model, failures cluster at the
+    Operational layer *before* reasoning-quality issues even become
+    visible — it never gets far enough (no task reached `edit_file` success
+    + `submit_patch`) for "right file, wrong logic" to be observable. Per
+    the plan's own mapping (Navigation → retrieval/graph-tool fixes,
+    Operational → tool/budget/prompt fixes), this points squarely at
+    prompt-level fixes first (anti-repetition steering, explicit
+    `run_command`-for-exploration guidance, `edit_file` parameter
+    examples) — not graph-tool investment — as the highest-leverage next
+    step for this model, at least until those Operational failures clear
+    and Reasoning-layer issues become visible to diagnose.
+- Results dir: `results/00_baseline-proxy-model/` (same as step 3, no new
+  run).
+- Commit: see below.
