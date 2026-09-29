@@ -1,3 +1,7 @@
+# All external downloads (competition dataset via kagglehub, pulled Kaggle
+# notebooks/kernels, etc.) — large, regenerable, never committed
+downloads/
+
 # Native swegemma eval output — regenerated locally, not tracked
 results/
 
