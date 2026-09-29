@@ -592,3 +592,43 @@ Entry format:
   Candidate for a future round: explicit guidance on what to do when no
   targeted test is obvious (e.g. write and run a small inline assertion
   instead of skipping verification outright).
+
+## 2026-09-29 — 2026-09-29_step8-skill-mandatory
+- Hypothesis: Made repo-navigation skill loading mandatory (first tool call every task) instead of optional, since the prior optional framing meant it was never invoked. Same task (fastapi_15661) as the immediately prior run for direct comparison. Does the agent actually load it now, and does having the fastapi.md notes (which specifically warn about the scripts.prepare_release collection-error quirk and the vague-PR-statement pattern this task has) change its behavior/efficiency?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-skill-mandatory/`
+- Commit: `dd7a165e88c6e7c17d2475148e2dd129869cef8b` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/88d6113519ef41ffa9c5b82040a0190f
+
+### Analysis addendum — regression, and still no clear evidence the skill helps
+- **The mandatory rule worked mechanically**: `load_skill_resource(skill_name="repo-navigation", file_path="references/fastapi.md")` was the very first tool call this run — confirmed via the full tool-call listing. So the "optional = never invoked" problem from the prior test is fixed at the mechanism level.
+- **But this run broke the streak of 4 consecutive clean completions**:
+  `error: "Agent exceeded turns budget (15 turns)"`, `agent_patch_size=0`,
+  13 tool calls, 501.63s. Full tool sequence after loading the skill: explored
+  `.github/workflows/build-docs.yml`, `pyproject.toml`, ran
+  `search_similar_code`/`grep`, then made **three separate `edit_file`
+  attempts on `README.md`** (different line ranges/content each time — looks
+  like repeated struggling to land an edit on a badge/image URL), then
+  pivoted to `scripts/docs.py` at the very end. It never touched
+  `.github/workflows/publish.yml` — the file both of the two most recent
+  *successful* runs on this exact task focused on (version bump /
+  release-script approach).
+- **Plausible but unconfirmed explanation**: `references/fastapi.md`
+  mentions `docs_src/` for documentation tasks; this run may have
+  interpreted the vague "Automate release preparation" statement as a
+  documentation/README task instead of the version-bump interpretation that
+  worked in the two prior runs — the skill notes may have introduced a
+  distraction for this specific ambiguous task. Cannot be confirmed with
+  n=1 — this exact task has previously shown run-to-run variance under
+  *identical* settings (189s success vs. 300s+ timeout, back in step 7), so
+  plain nondeterminism can't be ruled out either.
+- **Conclusion for now**: no clear evidence the skill helps, one real
+  fixed cost (an extra mandatory tool call every task, permanently), and a
+  plausible (not confirmed) distraction risk on ambiguous tasks. Given
+  this, reverting the skill-loading instruction from mandatory back to
+  removed/optional-by-default is the more defensible default until there's
+  positive evidence to justify the fixed cost — a proper verdict would need
+  a larger sample (multiple tasks, several trials each) than the inference
+  budget available for this round supports.

@@ -414,3 +414,20 @@ resembling a sweep — reasonable given the new rule, but means Verify isn't
 reliably happening when no clear test target exists. Candidate for a future
 round (explicit guidance for the no-obvious-test case). Full detail in
 `experiments/CHANGELOG.md`.
+
+**Mandatory skill loading — tried, reverted.** Made the repo-navigation
+skill load mandatory (first tool call every task) and re-tested on the same
+task. The rule worked mechanically (`load_skill_resource` was the actual
+first call), but the run **broke the 4-run clean streak** — exceeded the
+turn budget, zero patch. Instead of the version-bump approach that worked
+in the two prior runs, it spent most of its turns on repeated `README.md`
+edit attempts before pivoting to `scripts/docs.py` at the very end, never
+touching the file the successful runs focused on. Plausible (not
+confirmed) explanation: the skill notes mention `docs_src/` for docs
+tasks, which may have nudged this ambiguous task toward a less productive
+interpretation — but this exact task has shown run-to-run variance under
+identical settings before, so plain nondeterminism can't be ruled out with
+n=1. **Reverted to optional** — no clear evidence of benefit, one real
+fixed cost (an extra turn every task), and a plausible distraction risk.
+A real verdict would need a larger sample than one round's inference
+budget supports. Full detail in `experiments/CHANGELOG.md`.
