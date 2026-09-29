@@ -1,0 +1,194 @@
+{
+  "seed": 20260929,
+  "smoke": {
+    "ids": [
+      "fastapi_15661",
+      "httpx_3672",
+      "requests_7505",
+      "rich_4070"
+    ],
+    "by_repo": {
+      "fastapi/fastapi": 1,
+      "encode/httpx": 1,
+      "psf/requests": 1,
+      "Textualize/rich": 1
+    }
+  },
+  "held_out": {
+    "ids": [
+      "fastapi_12942",
+      "fastapi_13713",
+      "fastapi_13786",
+      "fastapi_13920",
+      "fastapi_14303",
+      "fastapi_14851",
+      "fastapi_14986",
+      "fastapi_15030",
+      "fastapi_15745",
+      "fastapi_5624",
+      "requests_6629",
+      "requests_6757",
+      "rich_3043",
+      "rich_3067",
+      "rich_3718",
+      "rich_3882",
+      "rich_3935",
+      "rich_4076",
+      "rich_4077"
+    ],
+    "by_repo": {
+      "fastapi/fastapi": 10,
+      "psf/requests": 2,
+      "Textualize/rich": 7
+    }
+  },
+  "prompt_dev": {
+    "ids": [
+      "fastapi_11194",
+      "fastapi_14077",
+      "fastapi_14258",
+      "fastapi_14360",
+      "fastapi_14372",
+      "fastapi_14512",
+      "fastapi_14786",
+      "fastapi_14794",
+      "fastapi_14978",
+      "fastapi_15785",
+      "fastapi_5077",
+      "requests_7315",
+      "requests_7502",
+      "rich_2943",
+      "rich_3130",
+      "rich_3296",
+      "rich_3454",
+      "rich_3469",
+      "rich_3506",
+      "rich_3942",
+      "rich_4075"
+    ],
+    "by_repo": {
+      "fastapi/fastapi": 11,
+      "psf/requests": 2,
+      "Textualize/rich": 8
+    }
+  },
+  "comparison": {
+    "ids": [
+      "fastapi_14099",
+      "fastapi_14186",
+      "fastapi_14246",
+      "fastapi_14266",
+      "fastapi_14492",
+      "fastapi_14791",
+      "fastapi_14873",
+      "fastapi_14953",
+      "fastapi_9425",
+      "fastapi_9753",
+      "requests_6589",
+      "requests_7433",
+      "rich_3180",
+      "rich_3468",
+      "rich_3518",
+      "rich_3521",
+      "rich_3772",
+      "rich_3777",
+      "rich_3953"
+    ],
+    "by_repo": {
+      "fastapi/fastapi": 10,
+      "psf/requests": 2,
+      "Textualize/rich": 7
+    }
+  },
+  "unassigned_pool": {
+    "ids": [
+      "fastapi_11355",
+      "fastapi_13207",
+      "fastapi_13537",
+      "fastapi_14262",
+      "fastapi_14297",
+      "fastapi_14301",
+      "fastapi_14306",
+      "fastapi_14349",
+      "fastapi_14356",
+      "fastapi_14361",
+      "fastapi_14371",
+      "fastapi_14419",
+      "fastapi_14430",
+      "fastapi_14448",
+      "fastapi_14455",
+      "fastapi_14458",
+      "fastapi_14459",
+      "fastapi_14463",
+      "fastapi_14479",
+      "fastapi_14482",
+      "fastapi_14485",
+      "fastapi_14487",
+      "fastapi_14583",
+      "fastapi_14605",
+      "fastapi_14609",
+      "fastapi_14616",
+      "fastapi_14962",
+      "fastapi_14964",
+      "fastapi_15023",
+      "fastapi_15280",
+      "fastapi_15588",
+      "fastapi_15589",
+      "fastapi_15763",
+      "fastapi_15800",
+      "fastapi_9555",
+      "requests_6592",
+      "requests_6644",
+      "requests_7205",
+      "requests_7309",
+      "requests_7328",
+      "requests_7427",
+      "rich_2725",
+      "rich_3006",
+      "rich_3052",
+      "rich_3061",
+      "rich_3063",
+      "rich_3064",
+      "rich_3105",
+      "rich_3278",
+      "rich_3470",
+      "rich_3471",
+      "rich_3472",
+      "rich_3480",
+      "rich_3486",
+      "rich_3535",
+      "rich_3675",
+      "rich_3676",
+      "rich_3782",
+      "rich_3894",
+      "rich_3905",
+      "rich_3930",
+      "rich_3934",
+      "rich_3938",
+      "rich_3944",
+      "rich_4006",
+      "rich_4079"
+    ],
+    "by_repo": {
+      "fastapi/fastapi": 35,
+      "psf/requests": 6,
+      "Textualize/rich": 25
+    }
+  },
+  "known_anomalous_task_caveats_by_cohort": {
+    "prompt_dev": {
+      "requests_7315": "resolves with zero code changes (Fail-to-Pass violation)"
+    },
+    "comparison": {
+      "rich_3468": "resolves with zero code changes (Fail-to-Pass violation)",
+      "rich_3772": "OOM-killed (exit 137) in the structural baseline"
+    },
+    "unassigned_pool": {
+      "requests_7309": "resolves with zero code changes (Fail-to-Pass violation)",
+      "requests_7427": "resolves with zero code changes (Fail-to-Pass violation)",
+      "rich_3480": "OOM-killed (exit 137) in the structural baseline",
+      "rich_4006": "hit the 300s command timeout in the structural baseline"
+    }
+  },
+  "full_129_note": "Use the complete tasks.jsonl (no --task-ids filter) for milestone checkpoints only."
+}

@@ -232,3 +232,22 @@ stand-in model is useful for real orchestration debugging at scale.
 Needs rented NVIDIA hardware and real spend; out of scope to set up without
 explicit go-ahead. Current plan: the user will run this via Kaggle notebooks
 directly rather than this repo's local tooling.
+
+## Evaluation cohorts & promotion checklist (plan step 4)
+
+A discipline, not tooling — see the plan. `experiments/cohorts.json`
+(generated once, reproducibly, by `devtools/define_cohorts.py`; don't
+regenerate casually, membership must stay stable) defines: `smoke` (4 tasks,
+the ones already used throughout steps 1-3), `held_out` (19 — **never
+inspect these during prompt development**), `prompt_dev` (21), `comparison`
+(19), and an `unassigned_pool` (66, no current purpose). It also flags which
+cohorts contain step-3's known-anomalous tasks (zero-code-change resolves,
+OOM/timeout) so results can be interpreted correctly.
+
+`experiments/PROMOTION_CHECKLIST.md` is the literal, hand-walked gate to run
+through before spending rented-GPU budget on a candidate: config validates →
+Mac smoke → proxy-model smoke → beats/matches champion on
+prompt-dev/comparison (official model) → beats/matches champion on held-out
+→ full 129-task milestone check. `experiments/CHAMPION.md` tracks the
+current best validated config — currently "none yet", since `submission/` is
+still the empty scaffold from step 0.

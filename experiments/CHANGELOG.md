@@ -208,3 +208,27 @@ Entry format:
   Container-A tool-calling all work correctly end-to-end (see the
   `2026-09-29_proxy-sanity` entry above). This session's finding is about
   the *model's* behavior under budget pressure, not the harness wiring.
+
+## 2026-09-29 — Define evaluation cohorts (plan step 4)
+- Hypothesis: N/A — this is discipline/documentation, not an eval iteration
+  (per the plan, step 4 is explicitly "a discipline to follow, not
+  infrastructure to build").
+- Change: Wrote `devtools/define_cohorts.py` (one-shot, fixed-seed,
+  repo-stratified sampling over the 129 public tasks) and ran it to produce
+  `experiments/cohorts.json`: `smoke` (4, fixed = the tasks already used in
+  steps 1-3), `held_out` (19, never to be inspected during prompt
+  development), `prompt_dev` (21), `comparison` (19), `unassigned_pool` (66,
+  no current purpose). Cross-referenced against the step-3 structural
+  baseline's known-anomalous tasks (zero-code-change resolves, OOM/timeout)
+  and flagged wherever they landed. Also wrote `experiments/CHAMPION.md`
+  (champion-tracking convention, currently "none yet" — `submission/` is
+  still empty) and `experiments/PROMOTION_CHECKLIST.md` (the literal
+  hand-walked gate from config-validates through held-out to full-129).
+- Cohort: N/A.
+- Result: `held_out` avoided all 4 zero-code-change-resolve anomalies
+  (clean); `prompt_dev` has 1 (`requests_7315`) and `comparison` has 2
+  (`rich_3468`, `rich_3772` — the latter also OOM-killed in the structural
+  baseline). Full caveat list in `cohorts.json`'s
+  `known_anomalous_task_caveats_by_cohort`.
+- Results dir: N/A.
+- Commit: see below.
