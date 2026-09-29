@@ -363,3 +363,66 @@ Entry format:
   current operational issues are addressed (plan step 7).
 - Results dirs: `results/2026-09-29_step6-single-agent-v1/`,
   `results/2026-09-29_step6-single-agent-rich/`.
+
+## 2026-09-29 — 2026-09-29_step7-rich-v2
+- Hypothesis: step 7 v2 prompt: added explicit 'split old_string to <=5 lines' guidance + 'on 2nd edit_file failure, stop retrying and try something else' fallback. Does this fix rich_4070's 'old_string too large/complex' edit_file failure from the step-6 re-test?
+- Change: `swegemma eval --sandbox docker` against task(s) rich_4070, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke (rich_4070 is in the `smoke` cohort per `cohorts.json`, not
+  `prompt_dev` — mislabeled at launch time, corrected here; doesn't affect
+  the run itself, only this metadata)
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step7-rich-v2/`
+- Commit: `9e1afa814dbdf8003638b7b3a0500dba04213450` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/dcf3d2b09a2948b1acf32c4d092b45d8
+
+## 2026-09-29 — 2026-09-29_step7-requests-v2
+- Hypothesis: step 7 v2 prompt: added explicit 'on tool-call failure, change approach after 2 attempts, then submit_patch rather than keep looping' fallback. Does this fix requests_7505's step-3/5 pure reasoning-loop failure (restated the same plan across 8+ of 13 steps without acting)?
+- Change: `swegemma eval --sandbox docker` against task(s) requests_7505, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step7-requests-v2/`
+- Commit: `9e1afa814dbdf8003638b7b3a0500dba04213450` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/51ee9e2f59d142c2a88f90e6b8195bdf
+
+### Analysis addendum (plan step 7 — first prompt-iteration round)
+- **`edit_file` fix confirmed working**: `rich_4070` went from
+  `agent_patch_size=0` (step 6) to `agent_patch_size=556` — real edits
+  landed (`import logging` → `from __future__ import annotations`,
+  removed an unused `Traceback` import), no more "old_string too large"
+  failures. `test_exit_code=1` this time (a normal test failure from the
+  harness's Phase 2 verification, not a collection error) — the patch is
+  incomplete relative to the task (which needed multi-file changes; only
+  `rich/logging.py` was touched before running out of the 15-turn budget)
+  but the *mechanism* that was broken is fixed.
+- **Anti-repetition fix: partial, changed shape rather than eliminated
+  the problem.** `rich_4070`: after the successful edit, it fell into a
+  *new* repetition pattern — restating "I have already: 1. Read... 2.
+  Added..." across steps 9-16 without moving to the next required file
+  or running a verification test, and never called `submit_patch`
+  explicitly (harness's automatic fallback capture produced the patch at
+  session end). `requests_7505`: the model repeated the *literal same*
+  `grep -r "hasattr(data, \"read\")" src/requests/` command three times
+  ("tried it twice"... "tried it three times") — directly against the new
+  "don't resubmit the same arguments" instruction — then shifted to
+  repeatedly re-reading `src/requests/adapters.py` without ever calling
+  `edit_file`, despite explicitly claiming to have "confirmed the
+  structure" multiple times. More real tool calls happened this round (14
+  vs. 8 originally) and no pure-text-only turns, but the core failure —
+  not translating understanding into a completed edit — persists.
+- **Interpretation**: the v1 anti-repetition instruction addressed
+  "restating reasoning with zero tool calls." It does not reliably stop a
+  small model from repeating a *specific tool call* verbatim, or from
+  stalling after real progress when a multi-step task requires deciding
+  "what's next" rather than "recover from failure." Both are the same
+  underlying limitation (this model struggles to track "what have I
+  already tried" state precisely enough to act on it) wearing different
+  clothes.
+- **Not chased further this round** (time-boxed per the batching agreement
+  — two hypotheses, two tests, stop and report): a next iteration could
+  try making the "don't repeat the same call" rule use a stronger,
+  more concrete trigger (e.g. "if your last tool call's arguments matched
+  a previous one exactly, that is disallowed — choose a different
+  file/approach before calling any tool again") rather than the current
+  general framing, or try lowering `thinking_budget` to force shorter,
+  more decisive turns instead of letting the model reason at length before
+  each (repeated) action.

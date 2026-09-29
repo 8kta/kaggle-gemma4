@@ -15,6 +15,11 @@ Follow this loop once per task. Do not skip Reproduce — confirming you can obs
 ## Do Not Repeat Your Own Reasoning
 Each turn should either take a concrete tool action or, if you were interrupted mid-thought, continue directly into the next action — never restate the problem statement or your existing plan again before acting. If you notice your last two responses summarize the same understanding of the task without a new tool call in between, that is a signal to act immediately, not to re-analyze. Repeated reasoning consumes your turn/time budget without progress and is the most common way small models fail this benchmark.
 
+**This applies especially when a tool call fails or doesn't help.** A failed call is not a reason to re-explain the task to yourself — it's a signal to change your next action:
+1. First failure: retry the *same* goal with a materially different call (e.g. a smaller/more precise `old_string`, a narrower `read_file` range, a different search term). Do not resubmit the same arguments.
+2. Second consecutive failure on the same edit: stop retrying that exact edit. Re-read the target file fresh to confirm its current exact content, or try a different, smaller piece of the fix.
+3. If you've made two failed attempts at the same change and still can't apply it: submit whatever correct, verified progress you have via `submit_patch` rather than continuing to loop — a partial patch that's actually submitted beats burning the rest of your budget retrying the same failing call.
+
 ## Locating Target Files
 - Extract filenames, functions, classes, CLI subcommands, or error messages directly from the problem statement first — this is nearly always the fastest path.
 - Read only the specific target files and lines using `read_file`. Do not wander across unrelated files.
@@ -28,6 +33,8 @@ Each turn should either take a concrete tool action or, if you were interrupted 
 - `new_string` = the **new code** that should exist after the change.
 - Example: if you read `timeout: int = 30` and want to change the default to `60`, call `edit_file(path, old_string="timeout: int = 30", new_string="timeout: int = 60")` — not the other way around.
 - Keep `old_string` long enough to be unique in the file (include a line or two of surrounding context) but no longer than necessary. If a call fails because `old_string` matches multiple locations, add more surrounding context rather than guessing.
+- **Keep `old_string` to at most ~5 lines.** If the change spans more than that (e.g. rewriting a whole function body), split it into multiple sequential `edit_file` calls, each targeting one small contiguous snippet, rather than one call with a large `old_string`. Large/complex `old_string` values are the most common reason `edit_file` fails ("missing mandatory parameters" or a match error) — if you hit that error, don't retry the same large call, split it smaller instead.
+- Example of splitting a larger change: instead of one `edit_file` call replacing an entire function, make one call per changed line/block inside it — e.g. one call to add an import at the top of the file, a separate call to change the function signature, a separate call to change the return statement.
 - Prefer several small, focused `edit_file` calls over one large rewrite — this also avoids response truncation on large payloads.
 
 ## Run Targeted Tests Only (Existing Tests May Be Broken)

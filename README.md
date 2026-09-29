@@ -306,3 +306,32 @@ mode (`edit_file` mechanics, residual repetition under difficulty) — running
 the full ablation matrix now would likely just measure the same operational
 noise across all variants rather than discriminate between them. Revisit
 once step 7's prompt iteration clears the current operational issues.
+
+## Prompt-engineering iteration (plan step 7)
+
+**Round 1** (two independent fixes, tested against the two tasks that
+originally exposed each): added explicit `old_string`-splitting guidance +
+a "stop retrying, try something else" fallback to `system.md`, tested
+against `rich_4070`; added a "don't resubmit the same tool-call arguments"
+rule, tested against `requests_7505`.
+
+- **`edit_file` fix: confirmed working.** `rich_4070` went from
+  `agent_patch_size=0` to `556` — real edits landed, no more "old_string too
+  large" failures.
+- **Anti-repetition fix: partial — changed shape, didn't eliminate it.**
+  `rich_4070` stalled in a *new* way after its successful edit (repeatedly
+  re-summarizing progress instead of moving to the next file or verifying).
+  `requests_7505` repeated the literal same `grep` command three times —
+  directly against the new rule — before stalling on re-reading the same
+  file without ever calling `edit_file`. More real tool calls happened
+  (14 vs. 8), but "understanding something" still isn't reliably turning
+  into "acting on it."
+- **Read**: this is one underlying limitation (tracking "what have I
+  already tried" precisely enough to act differently) surfacing in
+  different forms, not two separate bugs. Full trace-level detail in
+  `experiments/CHANGELOG.md`.
+
+Stopped here per the round's scope (two hypotheses, two tests) rather than
+continuing to iterate unilaterally — next-round ideas noted in the
+CHANGELOG addendum (stronger same-call-detection wording; trying a lower
+`thinking_budget` to force shorter, more decisive turns).
