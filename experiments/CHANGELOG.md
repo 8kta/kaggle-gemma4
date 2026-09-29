@@ -468,3 +468,91 @@ Entry format:
 - **v3 prompt change kept** (the mechanical pre-call check superseding the
   v2 general framing) — this is the current state of `system.md` going
   forward.
+
+## 2026-09-29 — 2026-09-29_skill-test
+- Hypothesis: Does declaring a skills: field in agent.yaml work locally, given compile_submission() isn't passed a skill_registry in swegemma's agent_runner.py?
+- Change: `swegemma eval --sandbox docker --skip-agent-patch` against task(s) fastapi_15661, backend=none, env=local-mac, fidelity=structural.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_skill-test/`
+- Commit: `fefe269ad4e1b501702faa840f59b78dbe7402b2` (dirty worktree at run time)
+- MLflow: (not logged — see stderr for reason)
+
+## 2026-09-29 — 2026-09-29_skill-test2
+- Hypothesis: Real compile_submission() test: does declaring skills: [skills/test_skill] in agent.yaml crash compilation, given no skill_registry is passed in swegemma's agent_runner.py? Tiny budget - we only need to see if it gets past compilation, not complete the task.
+- Change: `swegemma eval --sandbox docker` against task(s) httpx_3672, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_skill-test2/`
+- Commit: `fefe269ad4e1b501702faa840f59b78dbe7402b2` (dirty worktree at run time)
+- MLflow: (not logged — see stderr for reason)
+
+## 2026-09-29 — 2026-09-29_skill-test3
+- Hypothesis: Retry with valid kebab-case SKILL.md frontmatter. Does compilation succeed now?
+- Change: `swegemma eval --sandbox docker` against task(s) httpx_3672, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_skill-test3/`
+- Commit: `fefe269ad4e1b501702faa840f59b78dbe7402b2` (dirty worktree at run time)
+- MLflow: (not logged — see stderr for reason)
+
+## 2026-09-29 — 2026-09-29_step8-skill-fastapi
+- Hypothesis: step 8: added a repo-navigation SKILL with per-repo notes (load_skill_resource, references/<repo>.md), optional per the prompt. Does the model actually invoke it on fastapi_15661 (the task its fastapi.md notes specifically address), and does it help vs the step7-v2/v3 runs on this task?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-skill-fastapi/`
+- Commit: `fefe269ad4e1b501702faa840f59b78dbe7402b2` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/d6366dad924644128217c4b7d5ac2eaa
+
+### Analysis addendum (plan step 8, part 1 — skills)
+- **Skills verification (before this run)**: initially assumed skills weren't
+  wired up in the local `swegemma eval` CLI path, since
+  `swegemma/harness/agent_runner.py`'s `compile_submission()` call doesn't
+  pass a `skill_registry` argument. This was **wrong** — confirmed
+  empirically with a minimal probe skill: compilation invokes
+  `resolve_skills()` independently and does validate/load skills correctly
+  (Pydantic frontmatter validation caught a snake_case name + missing
+  `description` on the first attempt; a corrected kebab-case skill compiled
+  cleanly, with the `google.adk` `SKILL_TOOLSET` experimental feature
+  activating). Ground-truth checked directly in
+  `google/adk/tools/skill_toolset.py`: the actual tool signatures are
+  `load_skill(skill_name)`, `load_skill_resource(skill_name, file_path)`,
+  `run_skill_script(skill_name, file_path)` — resource files must live under
+  a **`references/`** subfolder specifically (not `resources/`, which is
+  what `HARNESS_README.md`'s illustrative example tree uses — that doc
+  example is misleading; the runtime code is the ground truth).
+- **Built `submission/skills/repo-navigation/`**: one `references/<repo>.md`
+  file per target repo (fastapi/rich/requests/httpx), distilling everything
+  learned in steps 1-7 (fastapi's vague-PR-statement + `docs_src/` +
+  `scripts.prepare_release` collection-error gotcha; rich's resource-limit
+  and exact-terminal-output sensitivity; requests' clean `src/requests/`
+  layout and the zero-code-change-resolve curation quirk; httpx's thin
+  evidence base). Wired into `agent.yaml` via `skills:`, mentioned as
+  *optional* in `system.md`'s Think step (to avoid taxing every task with a
+  mandatory extra tool call).
+- **Result: the skill was never invoked.** Full tool-call sequence for this
+  run: `run_command(ls)` → `read_file(publish.yml)` → `read_file(README.md)`
+  → `run_command(grep version)` → `run_command(grep __version__)` →
+  `read_file(__init__.py)` → `edit_file(bump version)` →
+  `run_command(pytest tests/)` → `submit_patch()`. No `load_skill`/
+  `load_skill_resource` call anywhere. The clean completion here (see next
+  bullet) is attributable to the already-validated v3 anti-repetition fix,
+  **not** the skill — "optional" means it's untested, not proven useless.
+  Would need either a mandatory-load variant or a larger sample to get real
+  signal on whether it helps.
+- **New finding, unrelated to skills**: the agent ran `pytest tests/` — a
+  bare, full-repo sweep — directly against the existing "NEVER run bare
+  pytest" rule in `system.md`. `test_exit_code=2` (collection error) is
+  plausibly the exact `scripts.prepare_release` import issue that
+  `references/fastapi.md` already documents — content that would have
+  helped here but was never loaded (see above). Not chased further this
+  round; candidate for a future prompt-iteration round (make the "no bare
+  pytest" rule more mechanical, mirroring what worked for anti-repetition
+  in step 7 round 2).
+- **Positive, separate from the skill**: 3rd consecutive clean completion
+  in a row now (`error: null`) — `264.72s`, real 347-byte patch, only 8 tool
+  calls (down from step 6's 11-tool-call non-completion on this exact
+  task), and the **first explicit `submit_patch()` call** seen in any trace
+  this project (all prior "successful" runs relied on the harness's
+  automatic fallback capture). The v3 prompt fix continues to compound.

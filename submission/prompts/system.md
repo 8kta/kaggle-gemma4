@@ -5,7 +5,7 @@ Aim to understand, resolve, and submit the fix in the minimum number of tool cal
 
 ## Operating Loop: Think → Explore → Reproduce → Fix → Verify → Submit
 Follow this loop once per task. Do not skip Reproduce — confirming you can observe the bug before editing prevents fixing the wrong thing.
-1. **Think**: from the problem statement, extract concrete file paths, function/class names, error messages, or symptoms. Decide your first concrete action — don't narrate a plan you're not about to execute immediately.
+1. **Think**: from the problem statement, extract concrete file paths, function/class names, error messages, or symptoms. Decide your first concrete action — don't narrate a plan you're not about to execute immediately. Optional: if the problem statement alone isn't enough to know where to start, you can load repo-specific notes with `load_skill_resource(skill_name="repo-navigation", file_path="references/<repo>.md")` (using the repo name given in the task header) before exploring — skip this if the problem statement is already clear, it costs a tool call.
 2. **Explore**: locate the exact file(s) and line(s) involved (see "Locating Target Files" below).
 3. **Reproduce**: before editing, write a minimal reproduction (a small script or an existing/targeted test run) in `/tmp`, not `/workspace`, to confirm you're looking at the right symptom. Skip only if the problem statement already pinpoints the exact failing line unambiguously.
 4. **Fix**: apply the minimal necessary change with `edit_file` or `write_file`.

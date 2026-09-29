@@ -362,3 +362,33 @@ predicted would become visible once Operational failures stopped blocking
 everything. Not confirmed without reading the full problem statement; noted
 for a future round, not chased further now. Full detail in
 `experiments/CHANGELOG.md`.
+
+## Custom skills (plan step 8, part 1)
+
+Initially assumed skills weren't wired up locally (`compile_submission()`'s
+call site doesn't pass a `skill_registry`) — **wrong**, confirmed
+empirically: compilation independently resolves/validates skills, and a
+minimal probe skill compiled cleanly once given correct kebab-case
+frontmatter. Ground-truth tool signatures checked directly in
+`google/adk/tools/skill_toolset.py`: resource files must live under
+**`references/`** (not `resources/`, which is what `HARNESS_README.md`'s
+example tree misleadingly shows).
+
+Built `submission/skills/repo-navigation/` — one `references/<repo>.md` per
+target repo, distilling everything learned in steps 1-7. Framed as
+*optional* in the prompt to avoid taxing every task with an extra tool call.
+
+**Result: never invoked.** The one test run that exercised it (`fastapi_15661`,
+the exact task its notes address) never called `load_skill`/
+`load_skill_resource` — full tool sequence was `ls` → read → grep → read →
+edit → `pytest tests/` → `submit_patch`. So "optional" currently means
+"untested," not "proven useless." Separately, that run also surfaced a real,
+new issue: it ran a bare `pytest tests/` sweep against the existing "never
+run bare pytest" rule — and `test_exit_code=2` is plausibly the exact
+collection-error gotcha the (unloaded) skill notes already documented.
+
+On the positive side, unrelated to the skill: 3rd consecutive clean
+completion (`error: null`), 264.72s, real patch, 8 tool calls, and the
+**first explicit `submit_patch()` call** seen in any trace this project
+(every prior success relied on the harness's automatic fallback capture).
+The v3 anti-repetition fix keeps compounding.
