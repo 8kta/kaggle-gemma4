@@ -241,6 +241,16 @@ tasks.
   rate, and total navigation time, alongside resolution rate — this is what
   tells you whether the graph tools are actually earning their token budget for
   a given repo, not just assumed to help.
+  **Done (2026-09-30, proxy-model, `smoke` cohort, n=4/arm)** — see
+  `experiments/CHANGELOG.md` "step 8 retrieval ablation" addendum for the full
+  writeup. Headline: resolution rate gave no signal (0/4 all arms); on
+  navigation metrics, forcing graph-first actually *hurt* this stand-in model
+  (only 1/4 tasks reached a real fix attempt, vs. 4/4 for filesystem-only and
+  2/4 for hybrid) — a mandatory graph-tool call plus a redundant-`read_file`
+  loop pathology ate the turn/tool-call budget before it could edit. No change
+  made to the shipping `submission/` (kept hybrid/optional) — small n,
+  proxy-model only, re-validate on the official model before trusting this
+  generalizes.
 
 ## 9. (Optional but likely needed for competitiveness) LoRA fine-tuning
 - Build SFT/RL training data from the 129 tasks (problem_statement → tool-call

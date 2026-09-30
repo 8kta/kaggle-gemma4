@@ -142,6 +142,11 @@ This project aims to build an autonomous software engineering agent using **Gemm
 - **Graph Tool Integration**: Optimize pre-computed embeddings and graphs to reduce unnecessary `read_file` calls and prioritize high-probability symbols.
 - **Retrieval Ablation**: Compare filesystem-only, graph-first, and hybrid navigation on an identical task cohort.
 - **Retrieval Metrics**: Track tool calls and tokens before opening the first relevant file, successful symbol-discovery rate, redundant reads, total navigation time, and final resolution rate.
+  **Done (2026-09-30)** — see `experiments/CHANGELOG.md` "step 8 retrieval
+  ablation" addendum and `claude-idea.md` step 8 for the writeup (proxy-model,
+  smoke cohort, n=4/arm; forced graph-first hurt this stand-in model's
+  fix-reach rate; shipping submission left unchanged pending official-model
+  re-validation).
 
 ### Phase 5: Model Fine-Tuning (Optional/Competitive)
 - **Data Discipline**: Split training, development, and validation task IDs before generating trajectories. Track every source task and prevent reference patches or validation trajectories from leaking into training.

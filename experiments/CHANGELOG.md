@@ -670,3 +670,217 @@ Entry format:
 - Commit: see below.
 - Commit: `d23ed324efd3b6cf27c21913e9f616144ec346fc` (dirty worktree at run time)
 - MLflow: (not logged — see stderr for reason)
+
+## 2026-09-30 — Pipeline check before step 8 retrieval ablation: `.DS_Store` broke submission validation
+- Hypothesis: N/A — pipeline smoke test, not a real ablation data point.
+- Change: N/A. A test run of the new `filesystem-only` ablation variant
+  (`experiments/step8-retrieval-ablation/variants/filesystem-only/`) crashed
+  per-task with `SubmissionValidationError: File has disallowed extension
+  '': .DS_Store` — macOS Finder had dropped `.DS_Store` files into
+  `submission/` and its subdirectories, and `cp -R submission/. <variant>/`
+  copied them into all 3 ablation variant dirs. Same failure mode as the
+  earlier `.gitkeep`-extension bug. Removed `.DS_Store` from `submission/`
+  and all 3 variant dirs; this run's placeholder result (crash, not a real
+  resolution/navigation outcome) has been deleted, not counted in the
+  ablation.
+- Cohort: N/A — infra fix, verified by re-running the same task after the
+  fix (see next entry).
+- Result: N/A.
+- Results dir: N/A (deleted — not a valid data point).
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: N/A (the placeholder MLflow run from the crashed attempt was not cleaned up remotely — harmless, just an orphaned experiment row).
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-filesystem-only-fastapi_15661
+- Hypothesis: Step 8 retrieval ablation [filesystem-only] on fastapi_15661: Graph tools removed from agent.yaml + prompt/skill mentions stripped. Does removing graph-tool availability change tool-calls-before-first-file-open, redundant-read rate, or navigation time vs. hybrid?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-filesystem-only-fastapi_15661/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/b2153ef36a4746ce9039e392ffc092df
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-hybrid-fastapi_15661
+- Hypothesis: Step 8 retrieval ablation [hybrid] on fastapi_15661: Control arm: current shipping submission/ unchanged (all 9 tools, current prompt).
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-hybrid-fastapi_15661/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/5ac0b6e49f1d41ada63896ea9ebd6bae
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-hybrid-requests_7505
+- Hypothesis: Step 8 retrieval ablation [hybrid] on requests_7505: Control arm: current shipping submission/ unchanged (all 9 tools, current prompt).
+- Change: `swegemma eval --sandbox docker` against task(s) requests_7505, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-hybrid-requests_7505/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/1c8966a8b4c74417891924b6cd659774
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-hybrid-rich_4070
+- Hypothesis: Step 8 retrieval ablation [hybrid] on rich_4070: Control arm: current shipping submission/ unchanged (all 9 tools, current prompt).
+- Change: `swegemma eval --sandbox docker` against task(s) rich_4070, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-hybrid-rich_4070/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/1815ddd6245449b3ac3188b57b687c24
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-hybrid-httpx_3672
+- Hypothesis: Step 8 retrieval ablation [hybrid] on httpx_3672: Control arm: current shipping submission/ unchanged (all 9 tools, current prompt).
+- Change: `swegemma eval --sandbox docker` against task(s) httpx_3672, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-hybrid-httpx_3672/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/f089bdc8abbd42f793438ce50f18b34c
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-graph-first-fastapi_15661
+- Hypothesis: Step 8 retrieval ablation [graph-first] on fastapi_15661: All 9 tools kept, but 'Locating Target Files' now mandates a graph-tool call (search_similar_code/get_code_neighbors) before the first read_file/grep whenever a symbol is extractable. Does forcing graph-first navigation reduce tool-calls-before-first-file-open vs. hybrid, or just add an extra call that doesn't pay for itself?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-graph-first-fastapi_15661/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/580efbe518ad423e9995d920170b3b81
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-graph-first-requests_7505
+- Hypothesis: Step 8 retrieval ablation [graph-first] on requests_7505: All 9 tools kept, but 'Locating Target Files' now mandates a graph-tool call (search_similar_code/get_code_neighbors) before the first read_file/grep whenever a symbol is extractable. Does forcing graph-first navigation reduce tool-calls-before-first-file-open vs. hybrid, or just add an extra call that doesn't pay for itself?
+- Change: `swegemma eval --sandbox docker` against task(s) requests_7505, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-graph-first-requests_7505/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/f588bba74aaf4094895eb1b2d69057c9
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-graph-first-rich_4070
+- Hypothesis: Step 8 retrieval ablation [graph-first] on rich_4070: All 9 tools kept, but 'Locating Target Files' now mandates a graph-tool call (search_similar_code/get_code_neighbors) before the first read_file/grep whenever a symbol is extractable. Does forcing graph-first navigation reduce tool-calls-before-first-file-open vs. hybrid, or just add an extra call that doesn't pay for itself?
+- Change: `swegemma eval --sandbox docker` against task(s) rich_4070, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-graph-first-rich_4070/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/b85e93359e9a49e5b9744bdf8008ba53
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-graph-first-httpx_3672
+- Hypothesis: Step 8 retrieval ablation [graph-first] on httpx_3672: All 9 tools kept, but 'Locating Target Files' now mandates a graph-tool call (search_similar_code/get_code_neighbors) before the first read_file/grep whenever a symbol is extractable. Does forcing graph-first navigation reduce tool-calls-before-first-file-open vs. hybrid, or just add an extra call that doesn't pay for itself?
+- Change: `swegemma eval --sandbox docker` against task(s) httpx_3672, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-graph-first-httpx_3672/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/71ab48581b9542a694b90c679a0e1411
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-filesystem-only-requests_7505
+- Hypothesis: Step 8 retrieval ablation [filesystem-only] on requests_7505: Graph tools removed from agent.yaml + prompt/skill mentions stripped. Does removing graph-tool availability change tool-calls-before-first-file-open, redundant-read rate, or navigation time vs. hybrid?
+- Change: `swegemma eval --sandbox docker` against task(s) requests_7505, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-filesystem-only-requests_7505/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/12ec66287330428e9b1c625b3c643a83
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-filesystem-only-rich_4070
+- Hypothesis: Step 8 retrieval ablation [filesystem-only] on rich_4070: Graph tools removed from agent.yaml + prompt/skill mentions stripped. Does removing graph-tool availability change tool-calls-before-first-file-open, redundant-read rate, or navigation time vs. hybrid?
+- Change: `swegemma eval --sandbox docker` against task(s) rich_4070, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-filesystem-only-rich_4070/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/8ecb5b2d3d0c440481ae7943fad04de5
+
+## 2026-09-30 — 2026-09-29_step8-retrieval-filesystem-only-httpx_3672
+- Hypothesis: Step 8 retrieval ablation [filesystem-only] on httpx_3672: Graph tools removed from agent.yaml + prompt/skill mentions stripped. Does removing graph-tool availability change tool-calls-before-first-file-open, redundant-read rate, or navigation time vs. hybrid?
+- Change: `swegemma eval --sandbox docker` against task(s) httpx_3672, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-29_step8-retrieval-filesystem-only-httpx_3672/`
+- Commit: `28b8e59eff52a01171988af33a5895710d1d96c4` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/4b1db520f13442cd92a79d4b5cca3cc5
+
+### Analysis addendum — step 8 retrieval ablation (filesystem-only vs. graph-first vs. hybrid)
+Per plan step 8: "compare filesystem-only vs. graph-first vs. hybrid
+navigation on the smoke/prompt-dev cohort. Track tool calls and tokens
+spent before opening the first relevant file, redundant-read rate, and
+total navigation time, alongside resolution rate." Ran all 3 arms x all 4
+`smoke` tasks (12 runs total), `--fidelity proxy-model`, identical budgets
+(10 min / 25 tool calls / 15 turns) across every run. Variant configs:
+`devtools/retrieval_ablation/variants/{hybrid,filesystem-only,graph-first}/`
+(hybrid = byte-identical copy of shipping `submission/`; filesystem-only =
+`agent.yaml` drops the 3 graph tools + prompt/skill mentions stripped;
+graph-first = all 9 tools, but "Locating Target Files" mandates a
+graph-tool call before the first `read_file`/grep whenever a symbol is
+extractable). Metrics computed by `devtools/analyze_retrieval_ablation.py`
+by walking each run's trace JSON.
+
+- **Pipeline bug found and fixed before any real runs**: `cp -R
+  submission/. <variant>/` picked up macOS `.DS_Store` files, which broke
+  `compile_submission`'s extension allowlist (`SubmissionValidationError:
+  File has disallowed extension '': .DS_Store`) — same failure class as the
+  earlier `.gitkeep` bug. Removed from `submission/` and all 3 variants.
+- **Bash-tool timeout bug found mid-batch**: launched all 12 runs as one
+  `run_in_background` Bash call with an explicit 600000ms (10 min) timeout,
+  not realizing that ceiling applies even to backgrounded commands — it was
+  killed after 8/11 remaining runs (`hybrid` all 4, `graph-first` all 4)
+  had completed, mid-way through `filesystem-only`/`requests_7505`. Cleaned
+  up the orphaned sandbox container and the one partial run (no
+  `summary.json` — discarded, not counted), then relaunched the final 3
+  runs via `nohup ... & disown` (fully detached from the Bash tool's
+  process tree, immune to its 10-minute ceiling) with a persistent
+  `Monitor` watching the log for completion/error markers.
+- **Result**: `resolution_rate=0/4` for all three arms — no discriminating
+  signal from resolution rate alone (consistent with every prior
+  proxy-model run in this project; gemma4:e4b has not resolved a
+  smoke-cohort task yet regardless of prompt/tool changes). The ablation's
+  actual signal is in the navigation/behavioral metrics:
+
+  | variant | mean tool calls before 1st file open | mean graph-tool calls/task | tasks reaching a fix attempt (edit_file/write_file) | mean redundant-read rate |
+  |---|---|---|---|---|
+  | hybrid | 0.50 | 0.25 (1/4 tasks used it, voluntarily) | 2/4 | 29.3% |
+  | filesystem-only | 0.75 | 0 (correctly can't call them) | **4/4** | 28.9% |
+  | graph-first | 1.75 | 0.75 (3/4 tasks used it — mandate worked) | **1/4** | 33.8% |
+
+  Trace inspection (not just the aggregate table) explains graph-first's
+  low fix-reach rate: it's two distinct failure modes, not one. On
+  `fastapi_15661`, the graph-first agent ran an existing script
+  (`scripts/add_latest_release_date.py`) instead of editing source, then
+  called `submit_patch` anyway — a clean completion with no real fix (the
+  "Anti-Patterns to Avoid" section already warns against this; it happened
+  anyway). On `requests_7505` and `httpx_3672`, the graph-first agent fell
+  into a severe **redundant-read loop** — 9-14 consecutive `read_file`
+  calls on the same file (`adapters.py`, `_parsers.py`), varying only
+  `start_line`/`end_line`, never reaching `edit_file` before the budget ran
+  out. Notably, the *same* loop happened to `hybrid` on `httpx_3672`
+  (64.3% redundant-read rate) — but **not** to `filesystem-only` on the
+  same task, which read `_parsers.py` 4 times, then made 3 real `edit_file`
+  calls and even attempted test verification (`pytest
+  tests/test_parsers.py`), producing a 2025-byte patch vs. the read-loop
+  arms' comparatively empty trajectories.
+- **Mechanism note**: the existing "mandatory pre-call check" in
+  `prompts/system.md` forbids repeating an *identical* tool call, but a
+  `read_file` call with a different `start_line`/`end_line` slice of the
+  same file technically isn't identical — so this specific redundant-read
+  pattern slips past the current check. Worth tightening in a future
+  step-7-style prompt round (not done here — out of scope for this
+  ablation).
+- **Caveats — do not over-read this**: n=4 tasks/arm, single trial each, no
+  repeated runs — this project has already documented real run-to-run
+  variance on identical settings (step 7, `rich_4070`: 189s success vs.
+  300s+ timeout). The `httpx_3672` graph-tools-correlate-with-read-loops
+  observation is n=1 per arm on one task — suggestive, not confirmed.
+  Everything here is `--fidelity proxy-model` on the small `gemma4:e4b`
+  stand-in; the official 31B model may not share this failure mode at all
+  (per the standing scope caveat above the step 6 section of `README.md`).
+- **Decision**: no change to the shipping `submission/agent.yaml` or
+  `prompts/system.md` — the current hybrid/optional-graph-tool default
+  showed no clear downside vs. filesystem-only except on the one
+  `httpx_3672` case, and graph-first's forced-usage framing showed a real,
+  measurable cost (delayed first file open, crowded-out fix attempts) for
+  this specific stand-in model that may not generalize to the official
+  model this submission actually ships against. Re-validate on the
+  official-model Kaggle notebook path
+  (`devtools/generate_official_baseline_notebook.py`) once that's run, and
+  revisit the redundant-`read_file`-slice mechanical-check gap noted above
+  in a future prompt-iteration round.
+- Results dirs: `results/2026-09-29_step8-retrieval-{hybrid,filesystem-only,graph-first}-{fastapi_15661,requests_7505,rich_4070,httpx_3672}/` (12 dirs, individual entries above this addendum).
+- Commit: see below.

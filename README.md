@@ -461,3 +461,47 @@ n=1. **Reverted to optional** — no clear evidence of benefit, one real
 fixed cost (an extra turn every task), and a plausible distraction risk.
 A real verdict would need a larger sample than one round's inference
 budget supports. Full detail in `experiments/CHANGELOG.md`.
+
+## Retrieval ablation: filesystem-only vs. graph-first vs. hybrid (plan step 8, part 3)
+
+Built 3 submission variants (`devtools/retrieval_ablation/variants/`) —
+`hybrid` (unchanged shipping `submission/`), `filesystem-only` (`agent.yaml`
+drops the 3 graph tools, prompt/skill mentions stripped), `graph-first`
+(all 9 tools, but "Locating Target Files" mandates a graph-tool call before
+the first `read_file`/grep) — and ran all 3 arms × all 4 `smoke` tasks (12
+runs, `--fidelity proxy-model`, identical budgets) via
+`devtools/run_retrieval_ablation.py`. The harness auto-injects a
+"Code Intelligence Tools" prompt section whenever graph/embedding data
+exists for a task's repo, independent of `agent.yaml`'s declared tools —
+confirmed this empirically before writing the runner, and suppressed it for
+`filesystem-only` via a scratch cwd with empty `data/graphs`/`data/embeddings`
+dirs (`devtools/retrieval_ablation/fs_only_cwd/`), so that arm's prompt
+doesn't misleadingly advertise tools it can't call.
+
+**Resolution rate gave no signal** (0/4 for all three arms — consistent
+with every proxy-model run to date). The real signal is in the navigation
+metrics computed by `devtools/analyze_retrieval_ablation.py` from each
+run's trace: forcing graph-first measurably *hurt* this stand-in model —
+only 1/4 tasks reached a real fix attempt (`edit_file`/`write_file`), vs.
+4/4 for `filesystem-only` and 2/4 for `hybrid`. Trace inspection found two
+distinct causes: one task where the graph-first agent ran an existing
+script instead of editing source then submitted anyway (anti-pattern), and
+two tasks where it fell into a 9-14-call redundant-`read_file` loop (same
+file, varying line ranges) that consumed the entire budget before ever
+reaching `edit_file`. The same read-loop also hit `hybrid` on one task
+(`httpx_3672`) but not `filesystem-only` on that same task — suggestive
+that having graph tools available at all (used or not) may correlate with
+this small model's known repeated-reasoning failure mode, though this is
+n=1 per cell, not confirmed.
+
+**No change made to the shipping `submission/`** — kept the current
+hybrid/optional default. The evidence is real but thin (n=4/arm, single
+trial, proxy-model only) and the failure modes found are plausibly specific
+to this small stand-in's weaker multi-step planning, not necessarily the
+official 31B model this submission actually ships against. Re-validate once
+the official-model Kaggle notebook path has run. One concrete follow-up
+identified but not acted on here: the existing "mandatory pre-call check"
+forbids *identical* repeated tool calls, but a `read_file` with a different
+`start_line`/`end_line` slice of the same file isn't caught by that check —
+candidate for a future step-7-style prompt round. Full writeup in
+`experiments/CHANGELOG.md`.
