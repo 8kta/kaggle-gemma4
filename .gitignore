@@ -23,8 +23,12 @@ venv/
 .env
 *.env
 
-# LoRA adapter weights are large binary artifacts — track intentionally, not by default
-adapters/**/*.safetensors
+# LoRA adapter weights are large binary artifacts — track intentionally, not
+# by default. Leading **/ needed: without it, this pattern is anchored to the
+# repo root and silently does NOT match submission/adapters/ (verified empty
+# match with a bare `adapters/**/*.safetensors` — the real submission path
+# wasn't covered at all).
+**/adapters/**/*.safetensors
 
 # OS cruft
 .DS_Store

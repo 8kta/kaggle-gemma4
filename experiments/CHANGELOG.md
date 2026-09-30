@@ -550,12 +550,16 @@ Entry format:
   round; candidate for a future prompt-iteration round (make the "no bare
   pytest" rule more mechanical, mirroring what worked for anti-repetition
   in step 7 round 2).
-- **Positive, separate from the skill**: 3rd consecutive clean completion
-  in a row now (`error: null`) — `264.72s`, real 347-byte patch, only 8 tool
-  calls (down from step 6's 11-tool-call non-completion on this exact
-  task), and the **first explicit `submit_patch()` call** seen in any trace
-  this project (all prior "successful" runs relied on the harness's
-  automatic fallback capture). The v3 prompt fix continues to compound.
+- **Positive, separate from the skill**: **2nd** consecutive
+  agent-loop-finished-cleanly run (`error: null` — not "resolved", still
+  `false`; correction: an earlier version of this entry said "3rd" — there
+  was never a run labeled "2nd", the compile-only skill probes in between
+  were deliberate structural/budget checks, not real attempts, so I
+  miscounted) — `264.72s`, real 347-byte patch, only 8 tool calls (down from
+  step 6's 11-tool-call non-completion on this exact task), and the **first
+  explicit `submit_patch()` call** seen in any trace this project (all prior
+  "successful" runs relied on the harness's automatic fallback capture). The
+  v3 prompt fix continues to compound.
 
 ## 2026-09-29 — 2026-09-29_step8-pytest-fix
 - Hypothesis: Replaced the soft 'never run bare pytest' framing with a mechanical pre-call check (literal yes/no on whether the pytest command string contains a .py path or -k/:: selector), mirroring the technique that fixed anti-repetition in step 7 round 2. Does this stop the bare 'pytest tests/' call seen on this exact task in the prior run?
@@ -575,7 +579,7 @@ Entry format:
   mechanical-check technique that fixed anti-repetition in step 7 round 2
   (literal yes/no check on the command string, not a soft "don't do X")
   worked again here.
-- **4th consecutive clean completion** (`error: null`), 513.14s (well under
+- **3rd consecutive clean agent-loop finish** (`error: null`), 513.14s (well under
   budget), `agent_patch_size=3072` — a substantially larger, more
   substantive patch than the 347-byte version from the same task two runs
   ago. `test_exit_code=2` persists (same `scripts.prepare_release`
@@ -604,7 +608,7 @@ Entry format:
 
 ### Analysis addendum — regression, and still no clear evidence the skill helps
 - **The mandatory rule worked mechanically**: `load_skill_resource(skill_name="repo-navigation", file_path="references/fastapi.md")` was the very first tool call this run — confirmed via the full tool-call listing. So the "optional = never invoked" problem from the prior test is fixed at the mechanism level.
-- **But this run broke the streak of 4 consecutive clean completions**:
+- **But this run broke the streak of 3 consecutive clean agent-loop finishes**:
   `error: "Agent exceeded turns budget (15 turns)"`, `agent_patch_size=0`,
   13 tool calls, 501.63s. Full tool sequence after loading the skill: explored
   `.github/workflows/build-docs.yml`, `pyproject.toml`, ran
@@ -632,3 +636,37 @@ Entry format:
   positive evidence to justify the fixed cost — a proper verdict would need
   a larger sample (multiple tasks, several trials each) than the inference
   budget available for this round supports.
+
+## 2026-09-29 — Fix snapshot/live-dir mismatch and label-reuse overwrite (audit item #3)
+- Hypothesis: An external audit found two real bugs in `run_evaluation.py`:
+  (a) `run_swegemma_eval` passed `args.submission_dir` (the live `submission/`)
+  to `swegemma eval`, not the frozen `submission_snapshot/` — so the
+  "exact config used" claim was false whenever `submission/` changed between
+  snapshot time and eval start; (b) reusing a label silently `rmtree`'d the
+  previous run's snapshot and results, breaking the "every modification must
+  be versioned" principle. Confirmed 3 real duplicate labels already existed
+  in this changelog (`step6-single-agent-v1`, `proxy-sanity`,
+  `00_baseline-proxy-model`) as evidence.
+- Change: `run_swegemma_eval` now takes and uses the snapshot path
+  (`submission_dir_for_eval`), not the live dir; `mlflow_logging.log_eval_run`
+  is now also given the snapshot dir for hashing, for the same reason. Added
+  `archive_if_exists()`: if a label's `experiments/<label>/` or
+  `results/<label>/` already exists, rename it to `..._superseded_<UTC
+  timestamp>` instead of deleting it — no history is lost, but the label can
+  still be reused for iteration (matches how this session has actually used
+  labels throughout: same label, retry after a bug fix).
+- Cohort: N/A — infra fix, verified with two back-to-back real test runs on
+  the same label, not a real eval iteration (both test runs cleaned up after
+  verification, along with this note's own placeholder changelog entries).
+- Result: Verified both fixes empirically. Run 1: confirmed the actual
+  `swegemma eval` subprocess command line used
+  `--submission-dir .../experiments/<label>/submission_snapshot`, not
+  `submission/`. Run 2 (same label): produced
+  `[run_evaluation] NOTE: '<label>' already existed... archived the previous
+  one to '<label>_superseded_20260929T235134Z'` for **both**
+  `experiments/<label>/` and `results/<label>/`, with matching timestamps,
+  and the run completed normally afterward.
+- Results dir: N/A (cleaned up after verification).
+- Commit: see below.
+- Commit: `d23ed324efd3b6cf27c21913e9f616144ec346fc` (dirty worktree at run time)
+- MLflow: (not logged — see stderr for reason)

@@ -22,6 +22,17 @@ fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 python -V
+
+# An existing .venv could have been created with a stale/wrong Python (e.g.
+# manually, or by an older version of this script) — reusing it silently
+# would fail later with a confusing error deep in `pip install`, not here.
+# Fail loudly and immediately instead.
+if ! python -c "import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)"; then
+  echo "ERROR: existing .venv is on $(python -V 2>&1), but swegemma requires >=3.12." >&2
+  echo "  Fix: rm -rf .venv && ./devtools/setup_env.sh" >&2
+  exit 1
+fi
+
 pip install --quiet --upgrade pip
 
 echo "== 2/6: kagglehub + project-local cache =="
@@ -50,11 +61,32 @@ echo "Data dir: $DATA_DIR"
 echo "== 5/6: Harness wheelhouse (~827 MB, skips if already cached) =="
 WHEELHOUSE_DIR="$(python3 -c "import kagglehub; print(kagglehub.dataset_download('metric/gemma-4-developer-agent-wheelhouse'))")"
 echo "Wheelhouse dir: $WHEELHOUSE_DIR"
-pip install --quiet \
-  "$WHEELHOUSE_DIR/adk_eval_core-0.1.0-py3-none-any.whl" \
-  "$WHEELHOUSE_DIR/adk_submission-0.2.11-py3-none-any.whl" \
-  "$WHEELHOUSE_DIR/swegemma-0.2.7-py3-none-any.whl" \
-  "$WHEELHOUSE_DIR/google_adk-1.36.1-py3-none-any.whl"
+
+# Glob by package name prefix rather than hardcoding exact version numbers
+# (adk_eval_core-0.1.0-py3-none-any.whl etc.) — a wheelhouse dataset version
+# bump that ships a new package version would otherwise silently fail to
+# match a hardcoded filename and break this script.
+WHEEL_PATTERNS=(
+  "adk_eval_core-*-py3-none-any.whl"
+  "adk_submission-*-py3-none-any.whl"
+  "swegemma-*-py3-none-any.whl"
+  "google_adk-*-py3-none-any.whl"
+)
+WHEELS_TO_INSTALL=()
+for pattern in "${WHEEL_PATTERNS[@]}"; do
+  matches=("$WHEELHOUSE_DIR"/$pattern)
+  if [ ! -e "${matches[0]}" ]; then
+    echo "ERROR: no wheel matching '$pattern' found in $WHEELHOUSE_DIR." >&2
+    echo "  The wheelhouse dataset layout may have changed — check its contents manually." >&2
+    exit 1
+  fi
+  if [ "${#matches[@]}" -gt 1 ]; then
+    echo "NOTE: multiple wheels matched '$pattern' in $WHEELHOUSE_DIR: ${matches[*]}" >&2
+    echo "  Using the first match: ${matches[0]}" >&2
+  fi
+  WHEELS_TO_INSTALL+=("${matches[0]}")
+done
+pip install --quiet "${WHEELS_TO_INSTALL[@]}"
 
 echo "== 6/6: Pin remaining transitive dependencies =="
 pip install --quiet -r requirements-lock.txt

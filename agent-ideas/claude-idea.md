@@ -3,8 +3,11 @@
 This is the Kaggle **Gemma 4 Developer Agent Competition**: build a declarative ADK
 agent (YAML config + optional LoRA adapters) that uses `gemma-4-31b-it-qat-w4a16-ct`
 to autonomously fix real Python bugs (SWE-bench style), scored by pass/fail on
-held-out tests. The project currently only has the spec files (`Overview`, `Data`,
-`HARNESS_README.md`) — no code, data, or submission scaffold yet.
+held-out tests. **Note (2026-09-29): this "no code yet" framing describes the
+plan's starting point, not current state** — steps 1-8 below are now
+implemented in the `kaggle-gemma4` working repo (this file lives at
+`kaggle-gemma4/agent-ideas/claude-idea.md`); see `README.md`/
+`experiments/CHANGELOG.md` there for what's actually been built and verified.
 
 ## 1. Get the environment and data in place
 - Set up `kagglehub`, pull the dataset (`gemma-4-developer-agent`): `tasks.jsonl`,
@@ -147,7 +150,14 @@ tasks.
   - A small smoke set (one or two tasks per repo, covering common failure
     classes) — near-free, run on every change.
   - A prompt-development set (~15–25 tasks) — the day-to-day iteration set.
-  - A repo-balanced comparison set — for candidate-vs-champion decisions.
+  - A comparison set for candidate-vs-champion decisions. **Implementation
+    note (2026-09-29)**: `cohorts.json` made this repo-*proportional*
+    (matching each repo's share of the 129 tasks: 10 fastapi / 2 requests /
+    7 rich, 0 httpx since its 1 task is already in `smoke`), not strictly
+    repo-*balanced* (equal counts per repo) — true balance is impossible
+    anyway given httpx has only 1 public task total. Proportional was the
+    deliberate, defensible choice; noted here so "balanced" isn't taken
+    literally.
   - **A held-out slice of the public tasks that is never inspected during prompt
     development** — the only thing standing between "improved on my dev set" and
     "actually improved." Set this aside now, before any prompt tuning starts.
@@ -176,10 +186,13 @@ tasks.
     failures.
   - **Constraint**: accidental tampering with `pytest.ini`/`conftest.py` or other
     protected paths.
-- Look at repo-level breakdown (fastapi/starlette/pydantic/rich/requests/httpx) to
-  see if some repos need more graph-tool usage — a repo skewed toward Navigation
-  failures needs better graph-tool prompting; one skewed toward Reasoning needs
-  better fine-tuning/prompt logic, not more retrieval.
+- Look at repo-level breakdown across the **4 actual task repos** —
+  fastapi/fastapi, Textualize/rich, psf/requests, encode/httpx (confirmed via
+  `tasks.jsonl` in step 3; starlette/pydantic are fastapi's *dependencies*,
+  bundled in `wheels/` — they never generate their own tasks) — to see if some
+  repos need more graph-tool usage. A repo skewed toward Navigation failures
+  needs better graph-tool prompting; one skewed toward Reasoning needs better
+  fine-tuning/prompt logic, not more retrieval.
 
 ## 6. Design the agent architecture
 - Decide: single `LlmAgent` vs. root + sub-agents. Candidate multi-agent split:
@@ -219,8 +232,9 @@ tasks.
 - Consider packaging reusable `skills/<name>/SKILL.md` (+ `scripts/`, `resources/`)
   for things worth codifying once and reusing across tasks — e.g. a repo-mapping
   routine, a standardized regression-test scaffold, or repo-specific navigation
-  notes (fastapi/starlette/pydantic/rich/requests/httpx). Scripts run sandboxed via
-  `run_skill_script` and debit the same execution budget, so scope them tightly.
+  notes for the 4 actual task repos (fastapi/fastapi, Textualize/rich,
+  psf/requests, encode/httpx). Scripts run sandboxed via `run_skill_script`
+  and debit the same execution budget, so scope them tightly.
 - **Retrieval ablation — cheap cohort only**: compare filesystem-only vs.
   graph-first vs. hybrid navigation on the smoke/prompt-dev cohort. Track tool
   calls and tokens spent before opening the first relevant file, redundant-read
@@ -303,8 +317,19 @@ tasks.
   runway from Sep 28, 2026, but the LoRA training step (if pursued) is the long
   pole — worth starting data prep early.
 - Set internal milestones against those dates rather than working toward them
-  blind: environment/data readiness, first structural baseline, first
-  proxy-model loop, first official-model baseline, architecture freeze (step 6
-  ablation decided), LoRA freeze (if pursued), full-suite evaluation, and a final
-  candidate freeze with buffer days before Dec 2 for the submission-isolation
-  checks in step 11.
+  blind. Proposed schedule (adjust as real progress dictates — this is a
+  planning target, not a commitment):
+
+  | Milestone | Target date | Status (2026-09-29) |
+  |---|---|---|
+  | Environment/data readiness | 2026-09-29 | **Done** |
+  | First structural baseline | 2026-09-29 | **Done** |
+  | First proxy-model loop | 2026-09-29 | **Done** |
+  | Architecture decision (step 6) | 2026-09-29 | **Done** — single-agent |
+  | Retrieval ablation (step 8 remainder) | 2026-10-06 | Not started |
+  | First official-model baseline | 2026-10-13 | Not started — needs rented GPU access |
+  | LoRA go/no-go decision | 2026-10-20 | Not started |
+  | LoRA freeze (if pursued) | 2026-11-03 | — |
+  | Full 129-task official-model evaluation | 2026-11-17 | — |
+  | Final candidate freeze | 2026-11-25 | — (matches entry/merger deadline) |
+  | Submission packaging + isolation checks + submit | 2026-11-30 | — (2-day buffer before Dec 2) |

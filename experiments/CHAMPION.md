@@ -9,9 +9,14 @@ infrastructure to build").
 
 ## Status: none yet
 
-No candidate has been promoted. `submission/` is still the empty scaffold
-from step 0 — nothing to compare against until a real `agent.yaml` exists
-(plan steps 5-9).
+No candidate has been promoted. This is **not** because `submission/` is
+empty — it has had a real `agent.yaml`/`prompts`/`configs`/`skills` since
+plan step 6, and has gone through two rounds of prompt-engineering (step 7)
+plus a skills investigation (step 8). "None yet" reflects that no candidate
+has cleared `PROMOTION_CHECKLIST.md`: none has been run on the official
+model, passed the comparison cohort, or been checked against the held-out
+slice. All work so far is `--fidelity proxy-model` (the `gemma4:e4b`
+stand-in) — real prompt-mechanics evidence, but not a validated candidate.
 
 ---
 

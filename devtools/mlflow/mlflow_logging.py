@@ -128,8 +128,16 @@ def log_eval_run(
     extra_tags: dict[str, str] | None = None,
     tracking_uri: str = DEFAULT_TRACKING_URI,
     experiment_name: str = DEFAULT_EXPERIMENT_NAME,
+    git_info_override: dict[str, Any] | None = None,
 ) -> str | None:
     """Log a completed swegemma eval run to MLflow. Never raises.
+
+    git_info_override: pass {"git_commit": ..., "git_dirty": ...} when
+    results_dir was produced somewhere other than repo_dir's current checkout
+    (e.g. ingesting a rented-GPU run's results after the fact) — otherwise
+    this function reads repo_dir's *current local* git state, which for a
+    remote/after-the-fact run does NOT describe what actually produced
+    results_dir, only what the local machine happens to be on right now.
 
     Returns the parent run's URL on success, or None if MLflow logging was
     skipped/failed for any reason (the caller should treat that as
@@ -164,7 +172,7 @@ def log_eval_run(
             )
             experiment = mlflow.get_experiment(exp_id)
         mlflow.set_experiment(experiment_name)
-        gi = git_info(repo_dir)
+        gi = git_info_override if git_info_override is not None else git_info(repo_dir)
         hashes = hash_config(submission_dir)
 
         rate_key = "resolution_rate" if fidelity == "official-model" else "proxy_resolution_rate"

@@ -80,9 +80,9 @@ LARGE_BINARY_SUFFIXES = {".safetensors"}
 
 def snapshot_submission(submission_dir: Path, dest: Path) -> dict[str, str]:
     """Snapshot submission_dir into dest. Returns {relpath: method} for any
-    file handled specially (hardlink, or copy-fallback with a reason)."""
-    if dest.exists():
-        shutil.rmtree(dest)
+    file handled specially (hardlink, or copy-fallback with a reason).
+    Caller is responsible for archiving any pre-existing dest (see
+    archive_if_exists) — this assumes dest does not yet exist."""
     dest.mkdir(parents=True)
 
     manifest: dict[str, str] = {}
@@ -97,8 +97,15 @@ def snapshot_submission(submission_dir: Path, dest: Path) -> dict[str, str]:
         if is_large_binary:
             try:
                 os.link(src, target)
+                # Hard links share one inode — an in-place edit to *any* link
+                # (including the live submission/ file) would silently alter
+                # every past snapshot too. Make the inode read-only so an
+                # accidental in-place edit fails loudly instead. A genuine
+                # new adapter version is a new file/inode (e.g. a fresh
+                # training run's output), which is unaffected by this.
+                os.chmod(target, 0o444)
                 digest = hashlib.sha256(src.read_bytes()).hexdigest()
-                manifest[str(rel)] = f"hardlink sha256:{digest}"
+                manifest[str(rel)] = f"hardlink sha256:{digest} (read-only)"
                 continue
             except OSError as e:
                 print(f"[run_evaluation] NOTE: hard link failed for {rel} ({e}); "
@@ -111,6 +118,20 @@ def snapshot_submission(submission_dir: Path, dest: Path) -> dict[str, str]:
     if manifest:
         (dest / "ADAPTERS_MANIFEST.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
     return manifest
+
+
+def archive_if_exists(path: Path) -> None:
+    """If path already exists (label reuse), move it aside instead of letting
+    it get silently overwritten — every prior run's snapshot/results stays on
+    disk, findable, rather than being destroyed by a same-label re-run."""
+    if not path.exists():
+        return
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    archived = path.with_name(f"{path.name}_superseded_{timestamp}")
+    path.rename(archived)
+    print(f"[run_evaluation] NOTE: '{path.name}' already existed for this label "
+          f"(reused label) — archived the previous one to '{archived.name}' "
+          f"instead of overwriting it.", file=sys.stderr)
 
 
 def check_git_dirty(repo_dir: Path) -> bool:
@@ -126,13 +147,18 @@ def check_git_dirty(repo_dir: Path) -> bool:
     return gi["git_dirty"]
 
 
-def run_swegemma_eval(args: argparse.Namespace, results_dir: Path) -> int:
+def run_swegemma_eval(args: argparse.Namespace, results_dir: Path, submission_dir_for_eval: Path) -> int:
+    """submission_dir_for_eval is the frozen snapshot, not args.submission_dir —
+    the eval must run against exactly what was snapshotted/hashed/logged, or
+    the "exact config used" claim in the snapshot/config_hash is false (a
+    concurrent edit to the live submission/ between snapshot time and eval
+    start would otherwise silently go untested)."""
     cmd = [
         "swegemma", "eval",
         "--tasks", args.tasks,
         "--snapshots-dir", args.snapshots_dir,
         "--results-dir", str(results_dir),
-        "--submission-dir", args.submission_dir,
+        "--submission-dir", str(submission_dir_for_eval),
         "--sandbox", args.sandbox,
         "--display", args.display,
     ]
@@ -196,14 +222,22 @@ def main() -> int:
     results_dir = REPO_DIR / "results" / args.label
     experiment_dir = REPO_DIR / "experiments" / args.label
     submission_dir = Path(args.submission_dir).resolve()
+    snapshot_dir = experiment_dir / "submission_snapshot"
+
+    archive_if_exists(experiment_dir)
+    archive_if_exists(results_dir)
 
     experiment_dir.mkdir(parents=True, exist_ok=True)
-    snapshot_submission(submission_dir, experiment_dir / "submission_snapshot")
-    print(f"[run_evaluation] Snapshotted {submission_dir} -> {experiment_dir / 'submission_snapshot'}", file=sys.stderr)
+    snapshot_submission(submission_dir, snapshot_dir)
+    print(f"[run_evaluation] Snapshotted {submission_dir} -> {snapshot_dir}", file=sys.stderr)
 
     git_dirty = check_git_dirty(REPO_DIR)
 
-    exit_code = run_swegemma_eval(args, results_dir)
+    # Eval runs against the frozen snapshot, not the live submission_dir, so
+    # the config actually evaluated is guaranteed to match what was
+    # snapshotted/hashed/logged above (a concurrent edit to submission/ after
+    # this point can no longer silently change what gets tested).
+    exit_code = run_swegemma_eval(args, results_dir, snapshot_dir)
     if exit_code != 0 and not (results_dir / "summary.json").exists():
         print(f"[run_evaluation] swegemma eval failed (exit {exit_code}) with no results produced.", file=sys.stderr)
         return exit_code
@@ -216,10 +250,10 @@ def main() -> int:
             backend=args.backend,
             env=args.env,
             fidelity=args.fidelity,
-            submission_dir=submission_dir,
+            submission_dir=snapshot_dir,
             repo_dir=REPO_DIR,
             hypothesis=args.hypothesis,
-            config_snapshot_dir=experiment_dir / "submission_snapshot",
+            config_snapshot_dir=snapshot_dir,
         )
         print(f"[run_evaluation] MLflow: {mlflow_url or 'logging skipped/failed (see warnings above)'}", file=sys.stderr)
 

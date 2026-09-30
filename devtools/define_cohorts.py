@@ -14,6 +14,11 @@ a fixed seed for reproducibility. The smoke set is NOT sampled — it's fixed
 to the 4 tasks already used throughout steps 1-3
 (fastapi_15661, requests_7505, rich_4070, httpx_3672), for continuity with
 the structural/proxy-model baselines already run against them.
+
+Note: this makes `comparison` repo-*proportional* (matching each repo's
+share of the 129), not repo-*balanced* (equal counts per repo) — the plan's
+step 4 wording says "balanced" but true balance is impossible anyway given
+httpx has only 1 public task total. Proportional was the deliberate choice.
 """
 
 from __future__ import annotations

@@ -122,7 +122,7 @@ This project aims to build an autonomous software engineering agent using **Gemm
     - **Operational**: Truncated tool calls, budget exhaustion, or patch-apply failures.
     - **Constraint**: Accidental tampering with `pytest.ini` or `conftest.py`.
 - **Actionable Diagnosis**: Map navigation failures to retrieval and graph-tool changes, reasoning failures to prompt or training changes, operational failures to tool/budget changes, and constraint failures to explicit guardrails.
-- **Repo-Specific Analysis**: Compare performance across `fastapi`, `starlette`, `pydantic`, `rich`, `requests`, and `httpx` to determine whether specific repositories need different navigation strategies.
+- **Repo-Specific Analysis**: Compare performance across the 4 actual task repos — `fastapi/fastapi`, `Textualize/rich`, `psf/requests`, `encode/httpx` (confirmed via `tasks.jsonl`; `starlette`/`pydantic` are fastapi dependencies bundled in `wheels/`, not task-generating repos) — to determine whether specific repositories need different navigation strategies.
 
 ### Phase 3: Agent Architecture & Prompt Engineering
 - **Multi-Agent Design**:

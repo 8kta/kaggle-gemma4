@@ -28,8 +28,9 @@ and step 11 for the isolation checks that enforce this before packaging.
 
 ## Environment setup (plan step 1)
 
-Requires **Python 3.13** on PATH (matches the sandbox container — `swegemma`
-won't install on 3.11/3.12), Docker running, and Kaggle credentials already
+Requires **Python 3.13** on PATH (matches the sandbox container; `swegemma`'s
+actual requirement is `>=3.12` — 3.13 was chosen to match the container, not
+because 3.12 is unsupported), Docker running, and Kaggle credentials already
 configured (`python3 -c "import kagglehub; kagglehub.login()"` once per
 machine — prompts for an API token from kaggle.com/settings → API, writes it
 to `~/.kaggle/access_token`; never paste the token in chat/logs).
@@ -51,9 +52,11 @@ It does, in order:
    tasks, snapshots, graphs, embeddings, wheels, docker specs, sample_submission).
 5. Downloads the **harness wheelhouse** and installs the 4 pure-Python wheels
    from it. `swegemma`/`adk_submission`/`adk_eval_core` are **not on PyPI and
-   not in the competition dataset** — not mentioned anywhere in
-   `HARNESS_README.md`/`Overview`/`Data` either. They only surface via the
-   organizer's getting-started Kaggle notebook
+   not in the competition dataset.** `HARNESS_README.md` documents these
+   libraries' *behavior* extensively (that's its whole purpose) but never
+   says where to actually get/install them, and `Overview`/`Data` don't
+   mention them at all. They only surface via the organizer's getting-started
+   Kaggle notebook
    (`kaggle kernels pull ryanholbrook/getting-started-gemma-4-developer-agent`),
    whose first cell references the Kaggle dataset handle
    `metric/gemma-4-developer-agent-wheelhouse`
@@ -101,22 +104,32 @@ practice (always the source of truth) with best-effort MLflow logging
 python3 devtools/mlflow/run_evaluation.py \
   --label 2026-09-29_my-change \
   --submission-dir submission \
+  --models-yaml devtools/models-ollama-e4b.yaml \
   --task-ids fastapi_15661 requests_7505 \
-  --backend gemma-4-31b-qat --env local-mac --fidelity official-model \
+  --backend stand-in-e4b --env local-mac --fidelity proxy-model \
   --cohort smoke \
   --hypothesis "What you expect this change to do"
 ```
 
 What it does, every time, regardless of whether MLflow is reachable:
 1. Snapshots the exact submission config used to
-   `experiments/<label>/submission_snapshot/`.
+   `experiments/<label>/submission_snapshot/` — if that label already has a
+   snapshot (label reuse), the old one is renamed to
+   `..._superseded_<UTC timestamp>` first, never deleted.
 2. Warns (doesn't block) if `submission/` has uncommitted changes — the run's
    `config_hash` still pins the exact bytes, but the `git_commit` tag won't
    point at a commit containing them.
-3. Runs `swegemma eval` as a subprocess against a unique `results/<label>/`
-   dir.
+3. Runs `swegemma eval` as a subprocess **against the frozen snapshot from
+   step 1, not the live `submission/`** — so a concurrent edit to
+   `submission/` after the snapshot can't silently change what actually gets
+   evaluated. `results/<label>/` gets the same archive-on-reuse treatment as
+   the snapshot — "unique" means "unique after archiving," not
+   collision-proof on its own.
 4. Appends a templated entry to `experiments/CHANGELOG.md` (hypothesis,
-   change, cohort, result, results dir, commit, MLflow link).
+   change, cohort, result, results dir, commit, MLflow link) — **unless the
+   eval subprocess itself failed with no `summary.json` produced at all**, in
+   which case the run exits early with no changelog entry (nothing to
+   summarize).
 
 Then, best-effort: logs one MLflow **parent run** (tags: `backend`, `env`,
 `fidelity`, `git_commit`, `git_dirty`, `config_hash`, `hypothesis`; metrics:
@@ -249,8 +262,11 @@ through before spending rented-GPU budget on a candidate: config validates →
 Mac smoke → proxy-model smoke → beats/matches champion on
 prompt-dev/comparison (official model) → beats/matches champion on held-out
 → full 129-task milestone check. `experiments/CHAMPION.md` tracks the
-current best validated config — currently "none yet", since `submission/` is
-still the empty scaffold from step 0.
+current best validated config — currently "none yet": `submission/` has had
+a real `agent.yaml`/`prompts`/`configs`/`skills` since step 6, but no
+candidate has passed the promotion checklist above (no official-model run,
+no comparison-cohort pass, no held-out check) — "no champion" reflects that
+gate, not an empty directory.
 
 ## Failure-mode analysis (plan step 5)
 
@@ -275,6 +291,14 @@ investment. Sample size is small (1 task per repo) — full write-up with
 caveats in `experiments/CHANGELOG.md`.
 
 ## Agent architecture (plan step 6)
+
+> **Scope caveat covering steps 6-8 below**: none of this has been run
+> against the real `gemma-4-31b-it-qat-w4a16-ct` model — the official-GPU
+> baseline is still deferred (see step 3 above). Everything from here on is
+> `--fidelity proxy-model` (the `gemma4:e4b` stand-in via Ollama). Treat every
+> "clean completion" / "fix confirmed" claim below as *prompt-mechanics*
+> evidence on a small stand-in model, not a validated improvement on the
+> actual competition model — that validation is still pending.
 
 `submission/` now has a real `agent.yaml` + `prompts/system.md` +
 `configs/sampling.yaml` — single `LlmAgent`, no sub-agents. The prompt
@@ -343,9 +367,10 @@ prior call succeeded or failed"). Tested on `requests_7505` again — the
 exact task where round 1's general framing had failed (literal 3x `grep`
 repeat).
 
-**First clean completion of the whole project.** `error: null` — no
-timeout, no budget exhaustion, for the first time on any real
-(non-`--skip-agent-patch`) proxy-model run. Finished in 338.56s (well under
+**First clean completion of the whole project** (meaning: the agent loop
+finished on its own — no timeout, no budget exhaustion — not that the task
+was solved; `resolved` was still `false`). `error: null`, for the first time
+on any real (non-`--skip-agent-patch`) proxy-model run. Finished in 338.56s (well under
 the 15-min budget) with a real 609-byte patch, 11 tool calls (down from 14
 in round 1 on the same task — more efficient, not just longer). `grep` was
 still run twice, but this time the model actually *used* the second
@@ -387,11 +412,15 @@ new issue: it ran a bare `pytest tests/` sweep against the existing "never
 run bare pytest" rule — and `test_exit_code=2` is plausibly the exact
 collection-error gotcha the (unloaded) skill notes already documented.
 
-On the positive side, unrelated to the skill: 3rd consecutive clean
-completion (`error: null`), 264.72s, real patch, 8 tool calls, and the
-**first explicit `submit_patch()` call** seen in any trace this project
-(every prior success relied on the harness's automatic fallback capture).
-The v3 anti-repetition fix keeps compounding.
+On the positive side, unrelated to the skill: **2nd** consecutive
+agent-loop-finished-cleanly run (not "resolved" — same caveat as above),
+264.72s, real patch, 8 tool calls, and the **first explicit
+`submit_patch()` call** seen in any trace this project (every prior success
+relied on the harness's automatic fallback capture). The v3 anti-repetition
+fix keeps compounding. (Correction: an earlier version of this doc mislabeled
+this as "3rd" — there was no run ever labeled "2nd"; the compile-only skill
+probes in between were deliberate structural/budget checks, not real task
+attempts, and were never meant to count either way.)
 
 ## Fixing the bare-pytest violation (plan step 8, part 2)
 
@@ -404,9 +433,10 @@ don't send it") before every `pytest`/`unittest` call.
 **Confirmed working**: re-tested on the exact task that produced the
 violation. Zero `pytest`/`unittest` calls of any kind this run — instead of
 falling back to a broad sweep when no test file was obvious, the agent
-wrote and ran its own script directly. 4th consecutive clean completion,
-with a substantially larger, more substantive patch (3072 bytes vs. 347
-two runs ago on the same task).
+wrote and ran its own script directly. **3rd** consecutive clean
+agent-loop finish (again: loop finished without error, task still not
+resolved), with a substantially larger, more substantive patch (3072 bytes
+vs. 347 two runs ago on the same task).
 
 One secondary, not-chased-further observation: with no obvious targeted
 test available, the agent skipped Verify entirely rather than run anything
@@ -418,7 +448,7 @@ round (explicit guidance for the no-obvious-test case). Full detail in
 **Mandatory skill loading — tried, reverted.** Made the repo-navigation
 skill load mandatory (first tool call every task) and re-tested on the same
 task. The rule worked mechanically (`load_skill_resource` was the actual
-first call), but the run **broke the 4-run clean streak** — exceeded the
+first call), but the run **broke the 3-run clean streak** — exceeded the
 turn budget, zero patch. Instead of the version-bump approach that worked
 in the two prior runs, it spent most of its turns on repeated `README.md`
 edit attempts before pivoting to `scripts/docs.py` at the very end, never
