@@ -165,7 +165,43 @@ def build_notebook() -> dict:
             "  --backend gemma-4-31b-qat --env kaggle-notebook --fidelity official-model",
             "```",
         ),
-        md("## 1. Environment configuration and package installation"),
+        md("## 1. Kaggle environment defaults"),
+        code(
+            "# This Python 3 environment comes with many helpful analytics libraries installed",
+            "# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python",
+            "# For example, here's several helpful packages to load",
+            "",
+            "import numpy as np # linear algebra",
+            "import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)",
+            "",
+            "# Input data files are available in the read-only \"../input/\" directory",
+            "# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory",
+            "",
+            "import os",
+            "for dirname, _, filenames in os.walk('/kaggle/input'):",
+            "    for filename in filenames:",
+            "        print(os.path.join(dirname, filename))",
+            "",
+            "# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using \"Save & Run All\"",
+            "# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session",
+            "",
+            "# Use the kagglehub client library to attach Kaggle resources like competitions, datasets, and models to your session",
+            "# Learn more about kagglehub: https://github.com/Kaggle/kagglehub/blob/main/README.md",
+            "",
+            "import kagglehub",
+            "# kagglehub.dataset_download('<owner>/<dataset-slug>')",
+        ),
+        md(
+            "Note: the `os.walk('/kaggle/input')` listing above can be very long once the "
+            "competition dataset, wheelhouse dataset, and full model weights are all attached "
+            "— that's expected, not an error. This cell is otherwise unused by the rest of the "
+            "notebook: every path below is hardcoded to the attachment points this notebook's "
+            "prerequisites section specifies (`/kaggle/input/competitions/...`, "
+            "`/kaggle/input/datasets/...`, `/kaggle/input/models/...`), matching how the UI "
+            "\"Add Input\" flow mounts them rather than the `kagglehub.*_download()` calls shown "
+            "above (which would pull a second, separate copy into `/kaggle/working/` instead)."
+        ),
+        md("## 2. Environment configuration and package installation"),
         code(
             "import glob",
             "import importlib",
@@ -219,9 +255,9 @@ def build_notebook() -> dict:
             "importlib.invalidate_caches()",
             "print('Wheelhouse installation complete.')",
         ),
-        md("## 2. Reconstruct submission/ from kaggle-gemma4 (embedded verbatim, see notebook header for commit)"),
+        md("## 3. Reconstruct submission/ from kaggle-gemma4 (embedded verbatim, see notebook header for commit)"),
         code(*write_files_lines),
-        md("## 3. Competition dataset and our fixed smoke cohort"),
+        md("## 4. Competition dataset and our fixed smoke cohort"),
         code(
             "from swegemma.models import load_tasks",
             "",
@@ -241,7 +277,7 @@ def build_notebook() -> dict:
             "for t in tasks:",
             "    print(f'  - {t.instance_id} ({t.repo} @ {t.base_commit[:8]})')",
         ),
-        md("## 4. Start vLLM server (real gemma-4-31b-it-qat-w4a16-ct)"),
+        md("## 5. Start vLLM server (real gemma-4-31b-it-qat-w4a16-ct)"),
         code(
             "import litellm",
             "import torch",
@@ -288,7 +324,7 @@ def build_notebook() -> dict:
             "    api_key=INFERENCE_API_KEY,",
             ")",
         ),
-        md("## 5. Run the smoke cohort — Phase 1 inference + Phase 2 verification"),
+        md("## 6. Run the smoke cohort — Phase 1 inference + Phase 2 verification"),
         code(
             "import asyncio",
             "import concurrent.futures",
@@ -333,7 +369,7 @@ def build_notebook() -> dict:
             "summary = run_sync(evaluator.run, tasks)",
             "print(summary)",
         ),
-        md("## 6. Summarize and package for download"),
+        md("## 7. Summarize and package for download"),
         code(
             "import json",
             "",
