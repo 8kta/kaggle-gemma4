@@ -1238,3 +1238,27 @@ by walking each run's trace JSON.
   no local GPU to verify against directly.
 - Results dir: N/A.
 - Commit: see below.
+
+## 2026-09-30 — LoRA training notebook, bug #5: CUDA OOM on 2x T4
+- Hypothesis: N/A — bugfix, continuation of "Step 9 (part 2)" above. Bug
+  #4's fix worked: training actually reached the forward/backward pass
+  this time (masking bug gone), then hit a real `CUDA out of memory`
+  (`GPU 1 has a total capacity of 14.56 GiB... 13.44 GiB memory in use`).
+- Change: two fixes. (1) `MAX_SEQ_LENGTH` 8192 → 4096 — checked the real
+  `train.jsonl`'s size distribution: median ~16.7K chars (~4.2K est.
+  tokens), but a real long tail up to ~54K chars (~13.5K est. tokens) for
+  the largest trajectory (`fastapi_15800`). 8192 was too generous for 2x
+  T4's actual free VRAM once the model's own sharded weights are
+  accounted for; 4096 drops a meaningful chunk of the 44 examples but
+  should avoid OOM. (2) Added explicit `max_memory` per GPU to
+  `from_pretrained()` (`total_memory - 3GiB`), reserving headroom for
+  activation memory instead of letting `device_map='auto'` fill each GPU
+  close to capacity with weights alone.
+- Cohort: N/A.
+- Result: not yet confirmed — both fixes are reasoned from the real error
+  message and the real training-data size distribution (not guessed), but
+  unverified against an actual run. This one requires re-running from
+  cell 4 (model loading), not just the later cells, since both changes
+  touch how the model is loaded.
+- Results dir: N/A.
+- Commit: see below.

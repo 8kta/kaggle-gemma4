@@ -89,9 +89,15 @@ TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj"
 
 NUM_EPOCHS = 3
 LEARNING_RATE = 2e-4
-MAX_SEQ_LENGTH = 8192  # conservative vs. the model's 32768 ceiling — our
-# synthesized trajectories are long (multi-file patches); truncated
-# examples are dropped rather than silently corrupted, see the dataset cell.
+# 8192 OOM'd on 2x T4 (14.56 GiB/GPU) during the forward pass on a real run —
+# activation memory for a long sequence plus the model's own sharded weights
+# exceeded what was free. Dropped to 4096: real train.jsonl has a long tail
+# (up to ~13.5K estimated tokens for the largest trajectory), so this drops
+# a meaningful chunk of the 44 examples rather than risking OOM again —
+# tune back up if/when this actually runs on more VRAM (4x L4 = 96GB).
+# Truncated examples are dropped entirely, not silently corrupted, see the
+# dataset cell.
+MAX_SEQ_LENGTH = 4096
 
 
 def git_commit() -> str:
@@ -311,10 +317,24 @@ def build_notebook() -> dict:
             "if tokenizer.pad_token is None:",
             "    tokenizer.pad_token = tokenizer.eos_token",
             "",
+            "# Hit a real CUDA OOM on 2x T4 (14.56 GiB/GPU) without this: device_map='auto'",
+            "# alone let the model's own sharded weights fill each GPU close to its full",
+            "# capacity, leaving too little headroom for a long sequence's activation",
+            "# memory during the forward pass. Explicitly cap how much of each GPU the",
+            "# weights can use, reserving the rest for activations.",
+            "max_memory = None",
+            "if torch.cuda.is_available():",
+            "    max_memory = {",
+            "        i: f'{int(torch.cuda.get_device_properties(i).total_memory / 1024**3) - 3}GiB'",
+            "        for i in range(torch.cuda.device_count())",
+            "    }",
+            "    print(f'max_memory per GPU (reserving ~3GiB headroom for activations): {max_memory}')",
+            "",
             "base_model = AutoModelForCausalLM.from_pretrained(",
             "    str(MODEL_PATH),",
             "    quantization_config=bnb_config,",
             "    device_map='auto',",
+            "    max_memory=max_memory,",
             "    torch_dtype=compute_dtype,",
             ")",
             "print(f'Loaded {base_model.__class__.__name__}, {sum(p.numel() for p in base_model.parameters())/1e9:.1f}B params')",
