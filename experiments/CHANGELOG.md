@@ -1344,3 +1344,10 @@ by walking each run's trace JSON.
   since this touches the model-loading cell again).
 - Results dir: N/A.
 - Commit: see below.
+
+## 2026-09-30 — LoRA training notebook: torch_dtype deprecation (not a bug, proactive fix)
+- Change: `transformers` warned `torch_dtype` is deprecated in favor of
+  `dtype` on `AutoModelForCausalLM.from_pretrained()`. Not a failure —
+  fixed proactively before it becomes a real break in a future
+  `transformers` version.
+- Commit: see below.

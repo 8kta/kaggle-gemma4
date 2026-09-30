@@ -373,7 +373,7 @@ def build_notebook() -> dict:
             "    quantization_config=bnb_config,",
             "    device_map='auto',",
             "    max_memory=max_memory,",
-            "    torch_dtype=compute_dtype,",
+            "    dtype=compute_dtype,",
             ")",
             "print(f'Loaded {base_model.__class__.__name__}, {sum(p.numel() for p in base_model.parameters())/1e9:.1f}B params')",
         ),
