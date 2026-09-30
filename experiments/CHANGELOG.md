@@ -1011,3 +1011,34 @@ by walking each run's trace JSON.
   describes what ran, unlike every prior local run this project which always
   had a dirty worktree at run time).
 - MLflow: http://localhost:5001/#/experiments/9/runs/cd3f6aec2be6458d8cd072080faf7b4d
+
+## 2026-09-30 — 2026-09-30_official-smoke-v2 (context-window fix validated)
+- Hypothesis: Re-run of `2026-09-30_official-smoke-v1` after fixing
+  `max_output_tokens` 16384 → 8192 (fixed the `ContextWindowExceededError`
+  that crashed 3/4 tasks last time). Does the fix hold?
+- Change: none — same commit's submission, this is a re-run to validate
+  the prior fix, not a new config change.
+- Cohort: smoke, official model, Kaggle notebook (4-GPU accelerator,
+  Internet off).
+- Result: **fix confirmed — zero `ContextWindowExceededError` crashes this
+  time**, on any of the 4 tasks. `resolution_rate=0/4` still, but the
+  failure mode changed entirely:
+  - `fastapi_15661`, `requests_7505`, `rich_4070`: cleanly exhausted the
+    15-turn budget (`tool_calls=14` each) — no crash, same "clean
+    completion, unresolved" pattern seen throughout proxy-model testing,
+    now confirmed on the real model too.
+  - `httpx_3672`: **first-ever fully clean completion on the real official
+    model** — `error=None`, submitted within 11 tool calls, well under
+    budget. Not resolved, but the agent loop itself worked end-to-end:
+    explored, edited, verified, submitted, returned a final text response.
+  - `errors: 3` in `summary.json` counts the 3 turn-budget-exhaustion
+    outcomes as "errors" too (the harness doesn't distinguish "crashed"
+    from "ran out of budget" in that field) — don't read `errors: 3` as
+    "3 crashes"; it's 0 crashes, 3 budget-outs, 1 clean submit.
+- Results dir: N/A locally — ingested from
+  `manual_kaggle_results/extracted/results/results` (downloaded from the
+  same Kaggle notebook run, re-executed top-to-bottom with the fixed
+  `submission/configs/sampling.yaml` embedded).
+- Commit: `7ad5019be8e7a91f0777775b32566e6571812b47` (submission/ clean,
+  confirmed via `diff -r` against the downloaded snapshot before ingesting).
+- MLflow: http://localhost:5001/#/experiments/9/runs/d146253fc73740d3ac70122a9c07efda

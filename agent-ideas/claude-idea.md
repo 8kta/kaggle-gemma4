@@ -138,9 +138,12 @@ but only ever invoked from dev tooling, never from inside the submission itself.
     proxy-model run this project has done — `max_output_tokens: 16384`
     left too little input headroom on the real model's 32768-token context
     window, crashing 3/4 tasks with `ContextWindowExceededError`. Fixed
-    (→ 8192), not yet re-validated. See `experiments/CHANGELOG.md`
-    "2026-09-30_official-smoke-v1" and `README.md`'s official-model-baseline
-    section for full detail.
+    (→ 8192) and **re-validated same day**: re-ran clean, zero crashes,
+    one task (`httpx_3672`) completed fully cleanly — first-ever clean
+    agent-loop finish on the real official model. Still
+    `resolution_rate=0/4` (n=4 smoke sample). See
+    `experiments/CHANGELOG.md` "2026-09-30_official-smoke-v1" and "-v2",
+    and `README.md`'s official-model-baseline section for full detail.
 - Log each as its own `experiments/00_baseline-<tier>/` per the practice above —
   these are the reference points every later run gets compared against.
 - **Resource profiling** alongside each run: container platform, CPU/memory
@@ -360,7 +363,7 @@ tasks.
   | Architecture decision (step 6) | 2026-09-29 | **Done** — single-agent |
   | Retrieval ablation (step 8 remainder) | 2026-10-06 | **Done** (2026-09-30) — filesystem-only vs. graph-first vs. hybrid, n=4/arm proxy-model; no shipping change |
   | LoRA training data (step 9 part 1) | — | **Done** (2026-09-30) — 62/66 verified reference-patch trajectories |
-  | First official-model baseline | 2026-10-13 | **Done** (2026-09-30, ahead of schedule) — via personal Kaggle notebook, not rented GPU. Found and fixed a real `max_output_tokens` context-window bug invisible to every proxy-model run; fix not yet re-validated |
+  | First official-model baseline | 2026-10-13 | **Done** (2026-09-30, ahead of schedule) — via personal Kaggle notebook, not rented GPU. Found, fixed, and re-validated a real `max_output_tokens` context-window bug invisible to every proxy-model run; first-ever clean completion on the real model |
   | LoRA go/no-go decision | 2026-10-20 | Not started |
   | LoRA freeze (if pursued) | 2026-11-03 | — |
   | Full 129-task official-model evaluation | 2026-11-17 | — |

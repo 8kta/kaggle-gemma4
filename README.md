@@ -240,11 +240,15 @@ plan — not a benchmark number to report. Larger budgets and/or
 anti-repetition prompt steering (step 6) would likely be needed before this
 stand-in model is useful for real orchestration debugging at scale.
 
-### Official GPU baseline — deferred
+### Official GPU baseline — done (2026-09-30)
 
-Needs rented NVIDIA hardware and real spend; out of scope to set up without
-explicit go-ahead. Current plan: the user will run this via Kaggle notebooks
-directly rather than this repo's local tooling.
+Ran via a personal Kaggle notebook rather than rented hardware — see
+"First official-model baseline" below for the full writeup. Short version:
+`resolution_rate=0/4` on the smoke cohort, but the run's real value was
+catching a `max_output_tokens` context-window bug invisible to every
+proxy-model run this project has done. Fix applied and **re-validated**
+(2026-09-30) — zero crashes on the re-run, including the project's
+first-ever fully clean completion on the real official model.
 
 ## Evaluation cohorts & promotion checklist (plan step 4)
 
@@ -292,13 +296,20 @@ caveats in `experiments/CHANGELOG.md`.
 
 ## Agent architecture (plan step 6)
 
-> **Scope caveat covering steps 6-8 below**: none of this has been run
-> against the real `gemma-4-31b-it-qat-w4a16-ct` model — the official-GPU
-> baseline is still deferred (see step 3 above). Everything from here on is
-> `--fidelity proxy-model` (the `gemma4:e4b` stand-in via Ollama). Treat every
-> "clean completion" / "fix confirmed" claim below as *prompt-mechanics*
-> evidence on a small stand-in model, not a validated improvement on the
-> actual competition model — that validation is still pending.
+> **Scope caveat covering steps 6-8 below**: everything below was built and
+> tested exclusively with `--fidelity proxy-model` (the `gemma4:e4b`
+> stand-in via Ollama) — treat every "clean completion" / "fix confirmed"
+> claim as *prompt-mechanics* evidence on a small stand-in model, not a
+> validated improvement on the actual competition model. Two official-model
+> runs now exist (2026-09-30, see step 3 above): the first crashed 3/4 tasks
+> on a `max_output_tokens` bug before exercising much of what's below; the
+> second, after the fix, ran clean — no crashes, one fully clean completion.
+> That confirms the *orchestration/config layer* works end-to-end on the
+> real model, but it's still only n=4 smoke-cohort tasks with
+> `resolution_rate=0/4` — steps 6-8's specific claims below (which prompt
+> fixes help, whether the skill/retrieval choices are right, etc.) are
+> still only validated on the stand-in, not on the real model at any
+> meaningful sample size.
 
 `submission/` now has a real `agent.yaml` + `prompts/system.md` +
 `configs/sampling.yaml` — single `LlmAgent`, no sub-agents. The prompt
@@ -568,9 +579,17 @@ harness's expected offline mode).
 half the 32768-token context window on every turn, and real multi-turn
 conversations against the actual model (not the small `gemma4:e4b` stand-in,
 which never surfaced this in any prior run) grew past the remaining input
-budget by turn 8-10. Fixed: `max_output_tokens` 16384 → 8192, not yet
-re-validated (needs another Kaggle-notebook run). Full detail, including the
-exact error and per-task breakdown, in `experiments/CHANGELOG.md`.
+budget by turn 8-10. Fixed: `max_output_tokens` 16384 → 8192.
+
+**Re-validated same day**: re-ran the identical notebook top-to-bottom with
+the fix. Zero `ContextWindowExceededError` crashes on any of the 4 tasks.
+3 tasks cleanly exhausted their 15-turn budget instead (no crash); the 4th
+(`httpx_3672`) completed fully cleanly — submitted within budget with
+`error=None`, the project's first-ever clean agent-loop completion on the
+real official model. Still `resolution_rate=0/4` (expected for a 4-task
+smoke sample), but the orchestration/config layer now demonstrably works
+end-to-end against the real model. Full detail, including the exact error
+and per-task breakdown for both runs, in `experiments/CHANGELOG.md`.
 
 This is exactly why the scope caveat above the step 6 section exists — every
 proxy-model finding to date was validated only on a model that never grew
