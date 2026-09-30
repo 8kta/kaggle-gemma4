@@ -626,3 +626,33 @@ This is exactly why the scope caveat above the step 6 section exists — every
 proxy-model finding to date was validated only on a model that never grew
 its context enough to hit a real constraint that the actual competition
 model hits almost immediately.
+
+## LoRA training: QLoRA notebook build + first-run debugging (plan step 9, part 2)
+
+Built the actual GPU training step (`devtools/generate_lora_training_notebook.py`)
+on top of step 9 part 1's already-verified data pipeline — QLoRA (4-bit
+NF4 via `bitsandbytes`+`transformers`+`peft`) on the 44 reference-patch
+trajectories, base model `gemma-4-31b-it-qat-q4_0-unquantized`
+(`transformers` framework — chosen because it's the QAT-trained checkpoint
+before W4A16 packing, matching the competition's actual serving checkpoint;
+a plain `-it` or any `-assistant`-suffixed variant would introduce a
+base-weight mismatch). Rank 16, all 7 attention/MLP projections. The
+notebook skips attaching the competition dataset entirely so Internet can
+stay on for `pip install peft accelerate` — confirmed the wheelhouse has
+zero training libraries at all, only eval/serving ones.
+
+Caught two real bugs before ever touching Kaggle GPU time: a latent
+backslash-escaping bug in the `py_literal()` helper shared by every
+notebook generator (JSON-escaped unicode in the training data was getting
+reinterpreted by Python's own string parser, producing an invalid
+surrogate that would have crashed `write_text()`), and a hardcoded
+`torch.bfloat16` that would have failed on T4 exactly like the eval
+notebooks did before their fix. A third bug only showed up on the actual
+first run: `peft` doesn't recognize Gemma4's custom
+`Gemma4ClippableLinear` wrapper around its linear layers, so
+`get_peft_model()` failed immediately. Fixed by unwrapping the targeted
+layers back to their inner `Linear4bit` before LoRA injection — a
+training-time-only change, since the deployed adapter never goes through
+this module structure at inference. **Not yet confirmed working** — this
+fix is based on the error message alone (no local GPU to verify against)
+and awaiting a re-run. Full detail in `experiments/CHANGELOG.md`.

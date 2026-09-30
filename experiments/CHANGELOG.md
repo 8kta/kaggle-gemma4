@@ -1138,3 +1138,75 @@ by walking each run's trace JSON.
 - Commit: `a37dbce3d814d601b93907d66dac4ada7f3922a6` (submission/ clean,
   confirmed via `diff -r` against the downloaded snapshot before ingesting).
 - MLflow: http://localhost:5001/#/experiments/9/runs/0edd9f7265d54cccadf2e3df5ada4a38
+
+## 2026-09-30 — Step 9 (part 2): LoRA training notebook — build + first-run debugging
+- Hypothesis: N/A — infrastructure build, not an eval iteration. Building
+  the actual GPU training step (data pipeline from step 9 part 1 already
+  done) to test whether a LoRA adapter trained on the 44 verified
+  reference-patch trajectories can improve on the 10.5% comparison-cohort
+  resolution rate.
+- Change: new `devtools/generate_lora_training_notebook.py` — QLoRA
+  (4-bit NF4 via `bitsandbytes`+`transformers`+`peft`, no `trl`) on the
+  `train`/`dev` splits. Base model `gemma-4-31b-it-qat-q4_0-unquantized`
+  (transformers framework) — chosen specifically because it's the
+  QAT-trained checkpoint before W4A16 packing, matching the competition's
+  required serving checkpoint `gemma-4-31b-it-qat-w4a16-ct` (confirmed via
+  the Kaggle Models UI: a plain `gemma-4-31b-it` and multiple
+  `-assistant`-suffixed variants also exist, but `-assistant` is a
+  separate fine-tune lineage present across every model size — using it
+  would introduce base-weight mismatch vs. what's actually served).
+  Rank 16, targets all 7 attention/MLP projections per
+  `docs/HARNESS_README.md` §3.4's sizing table. Notebook deliberately
+  does NOT attach the competition dataset (training only needs our own
+  `experiments/lora_training_data/*.jsonl`, embedded verbatim) so Internet
+  can stay on for `pip install peft accelerate` — confirmed the wheelhouse
+  has zero training libraries (`peft`/`trl`/`accelerate`/`deepspeed` all
+  absent; it's scoped purely for eval/serving).
+- **Real bug #1 found before any Kaggle run**: the `py_literal()` helper
+  shared by all four notebook generators only escaped backslashes in one
+  edge case (a `"""`-collision fallback), never in the common path. The
+  training data contains JSON-escaped unicode (`\uXXXX` sequences from a
+  regex character class in some embedded source code, produced by
+  `json.dumps`'s default `ensure_ascii=True`) — when embedded raw into a
+  Python triple-quoted string, Python's own parser reinterpreted those as
+  real unicode escapes, producing an invalid unpaired surrogate and
+  crashing with `UnicodeEncodeError` the moment the notebook tried to
+  write the file. Fixed in all four generators; re-verified with actual
+  UTF-8 disk writes and byte-for-byte fidelity checks (not just JSON
+  parsing) this time. The three already-used eval notebooks were never
+  actually affected in practice — `submission/`'s own files happen to
+  contain no backslashes — but the bug was real and latent.
+- **Real bug #2 found before any Kaggle run**: hardcoded `torch.bfloat16`
+  in three places (model loading, `bnb_4bit_compute_dtype`,
+  `TrainingArguments.bf16`) would have crashed on a T4 GPU exactly like
+  the vLLM eval notebooks did before their fix (compute capability 7.5 <
+  8.0 required for bf16) — flagged proactively once the user mentioned
+  Internet-on likely forces a T4 x2 accelerator. Applied the same
+  compute-capability detection fix as the eval notebooks (`torch.cuda.
+  get_device_capability(0)[0] >= 8`), now flowing into all three
+  bf16-related call sites consistently.
+- **Real bug #3 found on the actual first Kaggle run**: `get_peft_model()`
+  raised `ValueError: Target module Gemma4ClippableLinear(...) is not
+  supported` — this Gemma4 `transformers` checkpoint wraps its linear
+  layers in a custom `Gemma4ClippableLinear` class (not a plain
+  `torch.nn.Linear`/`Linear4bit`), which `peft`'s LoRA injection doesn't
+  recognize even though it wraps a real `Linear4bit` internally (visible
+  directly in the error's own repr: `Gemma4ClippableLinear(linear):
+  Linear4bit(...)`). Fixed by unwrapping each targeted
+  `Gemma4ClippableLinear` back to its `.linear` submodule in place before
+  calling `get_peft_model()` — same weights/quantization, just without
+  the wrapper. Training-time-only change: the deployed adapter (small
+  low-rank matrices, saved separately) is what actually gets served later
+  via vLLM, which never touches this module structure. **Not yet
+  confirmed working** — fixed based on the error message alone (no local
+  GPU to test against), with a loud `assert n_unwrapped > 0` guard so it
+  fails clearly rather than silently no-opping if the assumption about
+  the wrapper's attribute name is wrong. Given to the user as a drop-in
+  cell-5 replacement rather than a full notebook re-run, since cell 4
+  (model loading — the slow part) had already succeeded.
+- Cohort: N/A — infrastructure, not an eval iteration.
+- Result: training run not yet completed end-to-end; three real bugs
+  found and fixed pre-emptively or reactively, one (`Gemma4ClippableLinear`
+  unwrap) still awaiting confirmation on a re-run.
+- Results dir: N/A.
+- Commit: see below.

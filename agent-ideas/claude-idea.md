@@ -300,6 +300,16 @@ tasks.
   adapter for a navigator/analyzer sub-agent) — start with modest ranks (16, 32)
   and only expand rank if evaluation evidence on the comparison cohort actually
   supports it (r=16–32 is safest under the 3 GiB budget with headroom).
+  **In progress (2026-09-30)** — see `experiments/CHANGELOG.md` "Step 9
+  (part 2)" entry. `devtools/generate_lora_training_notebook.py`: QLoRA
+  (r=16, 7 target modules) on the 44 `train`-split trajectories, base
+  model `gemma-4-31b-it-qat-q4_0-unquantized` (QAT-matched to the
+  competition's serving checkpoint, not plain `-it` or any `-assistant`
+  variant). Three real bugs found and fixed so far (a latent backslash-
+  escaping bug shared by all four notebook generators, a T4 bf16
+  incompatibility, and a `peft`-vs-`Gemma4ClippableLinear` incompatibility
+  found on the first real Kaggle run) — training not yet confirmed
+  working end-to-end.
 - Validate adapters don't break the single-base-model rule and fit `max_loras=8`,
   `max_lora_rank=128`.
 - Log training runs too: dataset/trajectory hashes, hyperparameters, target
