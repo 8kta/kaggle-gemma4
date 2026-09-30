@@ -1210,3 +1210,31 @@ by walking each run's trace JSON.
   unwrap) still awaiting confirmation on a re-run.
 - Results dir: N/A.
 - Commit: see below.
+
+## 2026-09-30 — LoRA training notebook, bug #4: apply_chat_template's inconsistent return type
+- Hypothesis: N/A — bugfix, continuation of "Step 9 (part 2)" above.
+  `Gemma4ClippableLinear` unwrap fix worked (training reached
+  `trainer.train()`, i.e. cells 1-7 — wheel install, data embedding,
+  4-bit model load, LoRA wrap, dataset build — all ran without error this
+  time), but hit a new `TypeError` inside the data collator.
+- Change: `tokenizer.apply_chat_template(...)` doesn't consistently
+  return a plain `list[int]` — depending on the tokenizer/processor it
+  can return a `BatchEncoding`/dict, or a tensor (optionally with a
+  leading batch dimension). Real error: `TypeError: unsupported operand
+  type(s) for +: 'BatchEncoding' and 'list'` inside `collate_fn`'s
+  `b['input_ids'] + [pad_id] * n_pad` — meaning `apply_chat_template` was
+  silently returning a `BatchEncoding` here, and every downstream
+  `len()`/slice/index call in `build_masked_example` had been operating
+  on it without immediately erroring (`BatchEncoding` partially supports
+  those via delegation) until the `+` concatenation finally broke.
+  Added `_to_id_list()`: normalizes any of list/dict/`BatchEncoding`-like/
+  tensor (with or without batch dim) into a plain `list[int]`, called at
+  both `apply_chat_template` call sites in `build_masked_example`.
+- Cohort: N/A.
+- Result: unit-tested `_to_id_list()` in isolation against all 4 input
+  shapes (plain list, dict, a `BatchEncoding`-like fake, tensor with/
+  without batch dim) — all normalize correctly. **Not yet confirmed on
+  the real tokenizer** — same caveat as the `Gemma4ClippableLinear` fix,
+  no local GPU to verify against directly.
+- Results dir: N/A.
+- Commit: see below.
