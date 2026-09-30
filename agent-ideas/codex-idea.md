@@ -150,6 +150,12 @@ This project aims to build an autonomous software engineering agent using **Gemm
 
 ### Phase 5: Model Fine-Tuning (Optional/Competitive)
 - **Data Discipline**: Split training, development, and validation task IDs before generating trajectories. Track every source task and prevent reference patches or validation trajectories from leaking into training.
+  **Done (2026-09-30)** — see `experiments/CHANGELOG.md` "Step 9 (part 1)"
+  entry and `claude-idea.md` step 9 for the writeup. Splits drawn from
+  `unassigned_pool` only; 62/66 tasks produced a reference-patch-derived
+  trajectory verified against real `git apply` output. Actual LoRA training
+  not started (needs GPU — will mirror the official-model Kaggle-notebook
+  handoff).
 - **LoRA Training**: Use successful and corrected failed trajectories to train PEFT adapters for:
     - Improved tool-calling precision.
     - Enhanced reasoning over graph structures.

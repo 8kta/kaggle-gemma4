@@ -884,3 +884,79 @@ by walking each run's trace JSON.
   in a future prompt-iteration round.
 - Results dirs: `results/2026-09-29_step8-retrieval-{hybrid,filesystem-only,graph-first}-{fastapi_15661,requests_7505,rich_4070,httpx_3672}/` (12 dirs, individual entries above this addendum).
 - Commit: see below.
+
+## 2026-09-30 — Step 9 (part 1): LoRA training data — splits + reference-patch trajectory synthesis
+- Hypothesis: N/A — data engineering, not an eval iteration. The stand-in
+  model has resolved zero smoke-cohort tasks throughout this project (see
+  every prior entry above), so there is no pool of real *successful*
+  trajectories to train on yet. Per claude-idea.md step 9 / codex-idea.md
+  phase 5, built the "synthetic trajectory" path instead: turn each task's
+  reference `patch` (tasks.jsonl ships one per task) directly into the
+  exact tool-call sequence that would produce it.
+- Change:
+  1. `devtools/define_lora_splits.py` — train/dev/validation split drawn
+     exclusively from `cohorts.json`'s `unassigned_pool` (66 tasks, the one
+     cohort step 4 didn't reserve for any evaluation purpose).
+     `held_out`/`comparison`/`prompt_dev`/`smoke` are all excluded (not
+     just `held_out`, which is all the plan explicitly named — the other
+     three are excluded too since training on what's used to judge/tune
+     candidates would contaminate those evaluations). Explicit leakage
+     assertions run every time: splits are pairwise disjoint, exactly
+     partition `unassigned_pool`, and none overlap a reserved cohort.
+     Wrote `experiments/lora_splits.json`: train=46, dev=10,
+     validation=10, repo-stratified, seed=20260930.
+  2. `devtools/build_lora_trajectories.py` — hand-rolled unified-diff
+     parser (no new dependency; the format is simple and bounded) turns
+     each file's hunks into `write_file` (new files) or `edit_file`
+     (modified files, one call per hunk) calls, prefixed by a `read_file`
+     for modified files and followed by a targeted `run_command pytest
+     <test file from test_patch>` + `submit_patch`. The user turn reuses
+     the harness's own `build_agent_prompt()` (same function
+     `agent_runner.py` calls at real eval time) so the SFT prompt format
+     exactly matches production, not a hand-approximated guess.
+  3. **Every trajectory is verified before being written, not just
+     assumed correct**: the synthesized edit_file/write_file sequence is
+     replayed in-memory (real string substitution) against the actual
+     pre-patch snapshot content, and the result is checked byte-for-byte
+     against a real `git apply` of the reference patch in a copy of the
+     same snapshot (snapshots are real git repos — confirmed via `tar -tzf`
+     showing `.git/`). A task that can't be verified this way is skipped
+     and logged, never silently included.
+  4. Two real parser bugs found and fixed via this verification, not by
+     inspection: (a) this dataset's "new file" patches don't consistently
+     use `--- /dev/null` — some use a real-looking `--- a/<path>` header
+     and signal "new file" only via the hunk (`@@ -0,0 ...` with zero old
+     lines); fixed by also checking the hunk shape. (b) some patches lack
+     a trailing newline after the final line, which `git apply` rejects
+     as "corrupt patch" even though the diff content itself is valid;
+     fixed by ensuring a trailing newline before feeding `git apply`
+     (parser itself was unaffected — `str.splitlines()` doesn't care).
+- Cohort: N/A (training data, drawn from `unassigned_pool`, disjoint from
+  every eval cohort — see leakage assertions above).
+- Result: 62/66 tasks (93.9%) produced a verified trajectory: train 44/46,
+  dev 9/10, validation 9/10. The 4 skips are logged in
+  `experiments/lora_training_data/{split}_skipped.jsonl`, not silently
+  dropped: 3 are `edit_file`-shaped ambiguity (a hunk's old_string isn't
+  unique in the file — the same real limitation `edit_file` itself would
+  hit), 1 (`rich_3930`) is a genuine fidelity-check failure on a huge
+  (308 KB, 29-hunk) patch touching an auto-generated Unicode width table
+  (`rich/_cell_widths.py`) — root cause not chased further given the small
+  residual (1/66) and that the check correctly caught and excluded it
+  rather than shipping wrong data.
+- Results dir: `experiments/lora_training_data/{train,dev,validation}.jsonl`
+  (gitignored — deterministically regenerable from `tasks.jsonl` +
+  `experiments/lora_splits.json` + `submission/prompts/system.md` via
+  `devtools/build_lora_trajectories.py --split <name>`, same reproducibility
+  posture as `results/`). Dataset hashes: train
+  sha256=131b0357f4e11411... (44 trajectories, 841535 bytes), dev
+  sha256=f65fff31040eec79... (9 trajectories, 207729 bytes), validation
+  sha256=8a575530dbf9a73c... (9 trajectories, 153722 bytes).
+- Commit: see below.
+- **Still pending (step 9 part 2, not done here)**: actual LoRA/PEFT
+  training needs a real GPU this Mac doesn't have — same constraint as the
+  official-model baseline (step 3). Will need a Kaggle-notebook-based
+  training run mirroring `devtools/generate_official_baseline_notebook.py`,
+  targeting ranks 16/32 on `q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj`
+  per `docs/HARNESS_README.md` §3.4's sizing table, with the resulting
+  adapter evaluated against the `comparison` cohort before promotion per
+  `PROMOTION_CHECKLIST.md`. Not started.

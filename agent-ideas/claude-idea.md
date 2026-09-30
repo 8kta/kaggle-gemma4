@@ -263,6 +263,18 @@ tasks.
   validation-cohort trajectory leaks into the training data — easy to do
   accidentally since `tasks.jsonl` ships the reference patch right next to the
   problem statement.
+  **Done (2026-09-30)** — see `experiments/CHANGELOG.md` "Step 9 (part 1)"
+  entry. `devtools/define_lora_splits.py` draws train/dev/validation
+  exclusively from `unassigned_pool` (46/10/10), excluding `held_out` plus
+  `comparison`/`prompt_dev`/`smoke` too (not just what the plan names), with
+  explicit leakage assertions.
+  `devtools/build_lora_trajectories.py` turns each task's reference patch
+  into the exact tool-call sequence that produces it, verified per-task by
+  replaying it and diffing byte-for-byte against a real `git apply` — 62/66
+  (93.9%) tasks produced a verified trajectory, the rest logged and skipped
+  rather than guessed. No model calls, no GPU — this is the "synthetic
+  trajectories" path since the stand-in model has zero real successful
+  trajectories to draw on yet.
 - Train LoRA adapter(s) for the coder agent (and optionally a separate lighter
   adapter for a navigator/analyzer sub-agent) — start with modest ranks (16, 32)
   and only expand rank if evaluation evidence on the comparison cohort actually

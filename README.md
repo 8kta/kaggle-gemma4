@@ -505,3 +505,47 @@ forbids *identical* repeated tool calls, but a `read_file` with a different
 `start_line`/`end_line` slice of the same file isn't caught by that check —
 candidate for a future step-7-style prompt round. Full writeup in
 `experiments/CHANGELOG.md`.
+
+## LoRA training data: splits + reference-patch trajectory synthesis (plan step 9, part 1)
+
+Built the data pipeline for step 9's LoRA fine-tuning — no GPU involved yet,
+this is pure CPU data engineering. `devtools/define_lora_splits.py` draws
+train/dev/validation (46/10/10 tasks) exclusively from `cohorts.json`'s
+`unassigned_pool`, the one cohort not reserved for any evaluation purpose;
+`held_out`, `comparison`, `prompt_dev`, and `smoke` are all excluded (the
+plan only names `held_out`, but training on what's used to judge or tune
+candidates would contaminate those evaluations), with explicit leakage
+assertions run every time.
+
+`devtools/build_lora_trajectories.py` then turns each training task's
+reference `patch` (tasks.jsonl ships one per task) directly into the
+tool-call sequence that produces it — `write_file` for new files,
+`read_file` + one `edit_file` per hunk for modified files, a targeted
+`pytest` verification, `submit_patch`. This is the "synthetic trajectories"
+path from the plan: the stand-in model has resolved zero smoke-cohort tasks
+all project, so there's no pool of real successful trajectories to draw on
+yet. The user-turn prompt reuses the harness's own `build_agent_prompt()`
+so it matches production formatting exactly.
+
+**Every trajectory is verified, not assumed correct**: the synthesized
+edit sequence is replayed in-memory against the real pre-patch snapshot
+content (snapshots are real git repos) and checked byte-for-byte against
+an actual `git apply` of the reference patch. This caught two real parser
+bugs during development — the dataset doesn't consistently mark new files
+with `--- /dev/null` (some use a real-looking path with a `@@ -0,0 ...`
+hunk instead), and some patches lack a trailing newline that `git apply`
+rejects as "corrupt" even though the diff is valid — both fixed and
+re-verified before trusting the output.
+
+**Result**: 62/66 tasks (93.9%) produced a verified trajectory (train
+44/46, dev 9/10, validation 9/10); the remaining 4 are logged as skips,
+not silently dropped — 3 are genuine `edit_file` ambiguity (a hunk's
+target text isn't unique in the file), 1 is a real fidelity-check failure
+on a large auto-generated data file, not chased further given it's 1/66.
+Training data lives in `experiments/lora_training_data/` (gitignored,
+deterministically regenerable — same posture as `results/`).
+
+**Not done yet**: actual LoRA/PEFT training needs a real GPU this Mac
+doesn't have, same constraint as the official-model baseline (step 3) —
+will need a Kaggle-notebook-based training run, still to be built. Full
+detail in `experiments/CHANGELOG.md`.
