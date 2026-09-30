@@ -1286,3 +1286,39 @@ by walking each run's trace JSON.
 - Result: not yet confirmed — awaiting a clean-kernel re-run.
 - Results dir: N/A.
 - Commit: see below.
+
+## 2026-09-30 — LoRA training notebook, bug #7: OOM during actual training (not loading)
+- Hypothesis: N/A — bugfix, continuation of "Step 9 (part 2)" above. After
+  a genuine kernel restart, training reached `trainer.train()`'s real
+  forward pass this time (bug #6's dirty-session diagnosis confirmed —
+  clean restart got further), then hit a new OOM *inside* `down_proj`'s
+  LoRA forward (`peft/tuners/lora/bnb.py`'s `result.clone()`), with GPU 1
+  at 14.44/14.56 GiB — essentially full.
+- Change: three fixes, motivated directly by the failure site. (1)
+  `TARGET_MODULES` dropped the 3 MLP projections (`gate_proj`/`up_proj`/
+  `down_proj`) — the actual OOM happened inside `down_proj`'s LoRA
+  forward, and MLP projections are the largest matrices in a transformer;
+  now attention-only (`q/k/v/o_proj`), a well-established lower-memory
+  QLoRA configuration. (2) `max_memory` cap tightened from `total-3GiB` to
+  `total-6GiB` per GPU — realized a 31B model at 4-bit only needs
+  ~7.75GiB/GPU for weights across 2 GPUs, so the previous cap (~11GiB) had
+  far more slack for weights than needed while leaving too little *real*
+  headroom for training-time activations/gradients. (3) Added
+  `gradient_checkpointing_kwargs={'use_reentrant': False}` — a known more
+  memory-efficient checkpointing mode.
+- **Self-caught mistake before telling the user to re-run**: initially
+  also cut `MAX_SEQ_LENGTH` 4096 → 2048 as a fourth lever, without first
+  checking the real survival rate at that cap. Computed it before
+  shipping: even the *original* 4096 cap only keeps 20/44 (45%) of
+  `train.jsonl`'s examples (long tail up to ~13.5K estimated tokens,
+  median already ~4.2K); 3072 and 2048 both keep **zero** examples. Would
+  have produced an empty dataset — a worse, more confusing failure than
+  the OOM it was meant to fix. Reverted to 4096; the three fixes above are
+  this round's actual levers.
+- Cohort: N/A.
+- Result: not yet confirmed — awaiting a re-run (needs a fresh kernel
+  restart again, since this touches both the model-loading cell's
+  `max_memory`/LoRA-wrapping cell's `target_modules` and the
+  `TrainingArguments` cell).
+- Results dir: N/A.
+- Commit: see below.

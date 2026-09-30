@@ -85,18 +85,28 @@ ADAPTER_NAME = "main_lora"
 LORA_RANK = 16
 LORA_ALPHA = 32
 LORA_DROPOUT = 0.05
-TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+# Dropped the 3 MLP projections (gate/up/down_proj) after a real OOM at
+# MAX_SEQ_LENGTH=4096 failed *specifically inside down_proj's LoRA forward*
+# (peft/tuners/lora/bnb.py's result.clone() call) — MLP projections are the
+# largest in a transformer and were the actual failure site. Attention-only
+# targeting is a well-established lower-memory QLoRA configuration; some
+# adapter expressiveness is traded for fitting on 2x T4 at all.
+TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj"]
 
 NUM_EPOCHS = 3
 LEARNING_RATE = 2e-4
-# 8192 OOM'd on 2x T4 (14.56 GiB/GPU) during the forward pass on a real run —
-# activation memory for a long sequence plus the model's own sharded weights
-# exceeded what was free. Dropped to 4096: real train.jsonl has a long tail
-# (up to ~13.5K estimated tokens for the largest trajectory), so this drops
-# a meaningful chunk of the 44 examples rather than risking OOM again —
-# tune back up if/when this actually runs on more VRAM (4x L4 = 96GB).
-# Truncated examples are dropped entirely, not silently corrupted, see the
-# dataset cell.
+# 8192 OOM'd on 2x T4 (14.56 GiB/GPU) loading; dropping to 4096 fixed that
+# but then OOM'd again *during training* (forward+backward activation memory,
+# not weight loading — see TARGET_MODULES and max_memory comments above/below
+# for the two other levers pulled instead of cutting this further). Checked
+# the real survival rate before going lower: even 4096 only keeps 20/44
+# (45%) of train.jsonl's examples (there's a long tail up to ~13.5K
+# estimated tokens); 3072 and 2048 both keep ZERO — the median example is
+# already ~4.2K estimated tokens. Cutting further would have produced an
+# empty dataset, a worse failure than the OOM it was meant to fix. Left at
+# 4096 — TARGET_MODULES/max_memory/gradient_checkpointing_kwargs are this
+# round's actual levers. Truncated examples are dropped entirely, not
+# silently corrupted, see the dataset cell.
 MAX_SEQ_LENGTH = 4096
 
 
@@ -339,16 +349,19 @@ def build_notebook() -> dict:
             "",
             "# Hit a real CUDA OOM on 2x T4 (14.56 GiB/GPU) without this: device_map='auto'",
             "# alone let the model's own sharded weights fill each GPU close to its full",
-            "# capacity, leaving too little headroom for a long sequence's activation",
-            "# memory during the forward pass. Explicitly cap how much of each GPU the",
-            "# weights can use, reserving the rest for activations.",
+            "# capacity, leaving too little headroom for activation/gradient memory during",
+            "# training. A 31B model at 4-bit only needs ~7.75GiB/GPU for weights across 2",
+            "# GPUs — reserving total-3GiB (~11GiB) left far more than that available to",
+            "# weights and, it turned out, still not enough real headroom for training (hit",
+            "# a second OOM during the actual forward/backward pass, not loading). Tightened",
+            "# to reserve what weights actually need, freeing real headroom for the rest.",
             "max_memory = None",
             "if torch.cuda.is_available():",
             "    max_memory = {",
-            "        i: f'{int(torch.cuda.get_device_properties(i).total_memory / 1024**3) - 3}GiB'",
+            "        i: f'{int(torch.cuda.get_device_properties(i).total_memory / 1024**3) - 6}GiB'",
             "        for i in range(torch.cuda.device_count())",
             "    }",
-            "    print(f'max_memory per GPU (reserving ~3GiB headroom for activations): {max_memory}')",
+            "    print(f'max_memory per GPU (reserving ~6GiB headroom for activations/gradients): {max_memory}')",
             "",
             "base_model = AutoModelForCausalLM.from_pretrained(",
             "    str(MODEL_PATH),",
@@ -522,6 +535,7 @@ def build_notebook() -> dict:
             "    per_device_eval_batch_size=1,",
             "    gradient_accumulation_steps=8,",
             "    gradient_checkpointing=True,",
+            "    gradient_checkpointing_kwargs={'use_reentrant': False},",
             f"    learning_rate={LEARNING_RATE},",
             "    bf16=(compute_dtype == torch.bfloat16),",
             "    fp16=(compute_dtype == torch.float16),",
