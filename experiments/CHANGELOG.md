@@ -1262,3 +1262,27 @@ by walking each run's trace JSON.
   touch how the model is loaded.
 - Results dir: N/A.
 - Commit: see below.
+
+## 2026-09-30 — LoRA training notebook, bug #6: dirty GPU state from prior OOM
+- Hypothesis: N/A — bugfix, continuation of "Step 9 (part 2)" above.
+  Bug #5's fixes (MAX_SEQ_LENGTH 4096, max_memory cap) hit a *new* OOM —
+  but this one during model *loading* itself (`caching_allocator_warmup`),
+  with GPU 0 already showing 13.29 GiB in use *before* this cell's own
+  allocation attempt. That's more than the ~11GiB `max_memory` cap should
+  have allowed, and the traceback showed the same kernel PID
+  (`ipykernel_58`) as the prior OOM — strong evidence the previous failed
+  attempt left GPU memory occupied (an exception's traceback holds
+  references to partially-allocated tensors, blocking garbage collection
+  until the kernel actually restarts), not a flaw in the cap itself.
+- Change: added a defensive `gc.collect()` + `torch.cuda.empty_cache()` +
+  per-GPU memory report at the top of the model-loading cell, with an
+  explicit warning if >1GiB is already allocated before loading even
+  starts (signals a dirty session, prompting a kernel restart instead of
+  just re-running the cell). Primary guidance given to the user: restart
+  the kernel and re-run the whole notebook fresh rather than retrying in
+  the same session — also ensures `PYTORCH_CUDA_ALLOC_CONF` (set in cell
+  2) takes effect from a genuinely clean process state.
+- Cohort: N/A.
+- Result: not yet confirmed — awaiting a clean-kernel re-run.
+- Results dir: N/A.
+- Commit: see below.
