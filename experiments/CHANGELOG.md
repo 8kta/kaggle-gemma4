@@ -1087,3 +1087,54 @@ by walking each run's trace JSON.
 - Commit: `4f8c05d05df5a5289b41f718524a5502b34787d6` (submission/ clean,
   confirmed via `diff -r` against the downloaded snapshot before ingesting).
 - MLflow: http://localhost:5001/#/experiments/9/runs/904e7c404d464e12bd42cdb71b897594
+
+## 2026-09-30 — 2026-09-30_official-maxturns-v1 (max_turns experiment: mixed, not a clean win)
+- Hypothesis: 16/17 unresolved `comparison`-cohort tasks exhausted
+  `max_turns=15` at *exactly* 14 tool calls each, suggesting turns (not
+  the 25-tool-call budget) is the binding constraint. Tests `max_turns`
+  15 → 25 in isolation on the `smoke` cohort (`max_tool_calls` 25 → 35 and
+  `max_time_minutes` 15 → 25 also raised, purely so neither becomes a new
+  hidden constraint in place of turns — not themselves under test). Does
+  `resolution_rate` improve?
+- Change: `devtools/generate_official_maxturns_notebook.py` — same
+  submission, same smoke cohort, only the three budget values raised.
+- Cohort: smoke (4 tasks), official model, Kaggle notebook.
+- Result: **`resolution_rate` stayed `0/4` — not a clean win, but not a
+  clean null result either.** Per-task, the extra budget cut both ways:
+  - `requests_7505` and `rich_4070` **got substantially further**: 24 tool
+    calls each (up from 14), used the *entire* new 25-turn budget, and
+    produced real, sizeable patches (5866 and 3615 bytes) with
+    `test_exit_code=1` (genuinely attempted and tested, just didn't pass)
+    — vs. turn-budget-exhaustion with no patch detail logged last time.
+    Real signal that turns *was* constraining these two specifically.
+  - `fastapi_15661` and `httpx_3672` **got worse** — both now hit
+    `ContextWindowExceededError` (the same error from the smoke v1 /
+    comparison-v1 runs) instead of their previous outcomes.
+    `fastapi_15661` previously cleanly exhausted the 15-turn budget; now
+    the extra room let its context grow past the `max_output_tokens=8192`
+    reservation before finishing (crashed at 15 tool calls). `httpx_3672`
+    was this project's **only prior clean completion** — now it crashed
+    at just 6 tool calls (but 296s — unusually slow per-call, consistent
+    with a verbose trajectory), zero patch produced. This could be
+    n=1 run-to-run variance (temperature=0.2, not deterministic) rather
+    than a direct causal effect of the turns change — can't rule that out
+    at this sample size, but the direction (more turns -> more chances to
+    grow past the context ceiling before finishing) is mechanistically
+    plausible independent of variance.
+- **Interpretation**: raising `max_turns` alone doesn't safely help while
+  `max_output_tokens` stays fixed — more turns means more opportunities
+  for context to grow past the ~24576-token input headroom before the
+  task finishes, trading "ran out of turns" failures for
+  "context-window crash" failures on some tasks while genuinely helping
+  others get further. A real fix likely needs `max_turns` raised
+  *alongside* a context-budget-aware mechanism (shrinking
+  `max_output_tokens` further, or truncating/summarizing older turns)
+  rather than either knob in isolation. n=4, one trial — not enough to
+  confirm the exact mechanism, just enough to say "raise max_turns alone"
+  isn't a safe, unambiguous win.
+- Results dir: N/A locally — ingested from
+  `manual_kaggle_results/extracted/results/results` via
+  `devtools/mlflow/ingest_results.py --cohort smoke`.
+- Commit: `a37dbce3d814d601b93907d66dac4ada7f3922a6` (submission/ clean,
+  confirmed via `diff -r` against the downloaded snapshot before ingesting).
+- MLflow: http://localhost:5001/#/experiments/9/runs/0edd9f7265d54cccadf2e3df5ada4a38

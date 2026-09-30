@@ -604,9 +604,23 @@ at *exactly* 14 tool calls each — suggesting the turn budget, not the
 tool-call budget, is the binding constraint right now. The
 `max_output_tokens=8192` fix reduced the context-window crash rate a lot
 (75% → 5.3% of tasks) but didn't eliminate it — one task still hit it on
-an unusually long trajectory. Full detail, including the exact error and
-per-task breakdown for all three official-model runs, in
-`experiments/CHANGELOG.md`.
+an unusually long trajectory.
+
+**Tested the turn-budget hypothesis directly, same day**
+(`devtools/generate_official_maxturns_notebook.py`): raised `max_turns`
+15 → 25 on the smoke cohort (with `max_tool_calls`/`max_time_minutes`
+also raised, so neither became a new hidden constraint). Result: mixed,
+not a clean win. `resolution_rate` stayed `0/4`, but 2 of the 4 tasks
+(`requests_7505`, `rich_4070`) used the *entire* new budget and produced
+real, substantial patches that actually got tested (just didn't pass) —
+real evidence turns was constraining them. The other 2
+(`fastapi_15661`, and `httpx_3672` — this project's only prior clean
+completion) instead hit `ContextWindowExceededError`, trading a
+turn-exhaustion failure for a context-window failure. Raising `max_turns`
+alone, without also addressing `max_output_tokens`, just shifts *where*
+some tasks fail rather than unambiguously helping. Full detail, including
+the exact error and per-task breakdown for all four official-model runs,
+in `experiments/CHANGELOG.md`.
 
 This is exactly why the scope caveat above the step 6 section exists — every
 proxy-model finding to date was validated only on a model that never grew
