@@ -5,6 +5,11 @@ downloads/
 # Native swegemma eval output — regenerated locally, not tracked
 results/
 
+# Downloaded results/submission zips from manual Kaggle-notebook runs
+# (official-model baseline) — large, ingested into MLflow + CHANGELOG.md,
+# not meant to live in git
+manual_kaggle_results/
+
 # Per-run trace/log/patch artifacts are large; keep only experiments/CHANGELOG.md
 # and any explicit per-run summary.json you choose to commit
 experiments/*/

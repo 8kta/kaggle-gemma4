@@ -960,3 +960,54 @@ by walking each run's trace JSON.
   per `docs/HARNESS_README.md` §3.4's sizing table, with the resulting
   adapter evaluated against the `comparison` cohort before promotion per
   `PROMOTION_CHECKLIST.md`. Not started.
+
+## 2026-09-30 — 2026-09-30_official-smoke-v1 (first official-model baseline)
+- Hypothesis: First real official-model (`gemma-4-31b-it-qat-w4a16-ct`) run
+  on the 4-task smoke cohort, via a personal Kaggle notebook
+  (`devtools/generate_official_baseline_notebook.py`). Does the config
+  that's only ever been proxy-tested on `gemma4:e4b` actually work against
+  the real model?
+- Change: none to the config being tested — this run used the submission as
+  of commit `87fa3ad58c5c6e91887f210a53950dc814552e21` (the state at
+  notebook-generation time), confirmed byte-identical to the locally
+  committed `submission/` at that commit via `diff -r` before ingestion.
+- Cohort: smoke, via Kaggle notebook, GPU accelerator varied across
+  attempts (T4 x2 rejected for `bfloat16` — compute capability 7.5 < 8.0 —
+  before landing on a 4-GPU accelerator that started cleanly with `tp=4`).
+- Result: `resolution_rate=0/4`, `errors=4`. **3 of 4 tasks
+  (`fastapi_15661`, `rich_4070`, `httpx_3672`) crashed with the identical
+  `litellm.ContextWindowExceededError`**: "maximum context length is 32768
+  tokens... requested 16384 output tokens and your prompt contains at
+  least 16385 input tokens" — i.e. `submission/configs/sampling.yaml`'s
+  `max_output_tokens: 16384` reserves exactly half the 32768-token context
+  window on *every* turn, and real multi-turn conversations against the
+  actual 31B model (real file-read content, real thinking traces) grew
+  past the remaining 16384-token input budget by turn 8-10. The 4th task
+  (`requests_7505`) didn't hit this — it cleanly exhausted its 15-turn
+  budget instead (`tool_calls=14`, `duration=338.36s`), no crash.
+  **The small `gemma4:e4b` proxy-model stand-in never surfaced this in any
+  prior run this whole project** — its conversations never grew large
+  enough, or Ollama's context handling differs from vLLM's strict
+  enforcement. This is exactly the kind of official-model-only finding the
+  standing scope caveat (top of this file, above the step 6 section) warned
+  could exist.
+- **Fix applied**: `submission/configs/sampling.yaml` `max_output_tokens`
+  16384 → 8192, leaving 24576 tokens of input headroom instead of 16384
+  (was already insufficient for even ~8-10 turns on the real model).
+  `thinking_config.thinking_budget` (4096) left unchanged — still a strict
+  sub-portion of the new, smaller `max_output_tokens`, so real completion
+  text still has headroom beyond thinking. Not yet re-validated against
+  the official model (needs another Kaggle-notebook run — expensive, not
+  done reflexively after every local-only config edit).
+- Results dir: N/A locally (ran on Kaggle, not `devtools/mlflow/run_evaluation.py`)
+  — results downloaded and ingested via
+  `devtools/mlflow/ingest_results.py --results-dir manual_kaggle_results/extracted/results/results
+  --submission-snapshot manual_kaggle_results/extracted/submission/submission
+  --git-commit 87fa3ad58c5c6e91887f210a53950dc814552e21
+  --backend gemma-4-31b-qat --env kaggle-notebook --fidelity official-model`.
+- Commit: `87fa3ad58c5c6e91887f210a53950dc814552e21` (submission/ was clean —
+  confirmed via `git status --short submission/` and a `diff -r` against the
+  downloaded submission snapshot before ingesting, so this commit accurately
+  describes what ran, unlike every prior local run this project which always
+  had a dirty worktree at run time).
+- MLflow: http://localhost:5001/#/experiments/9/runs/cd3f6aec2be6458d8cd072080faf7b4d

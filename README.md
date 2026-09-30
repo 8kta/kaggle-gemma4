@@ -549,3 +549,30 @@ deterministically regenerable — same posture as `results/`).
 doesn't have, same constraint as the official-model baseline (step 3) —
 will need a Kaggle-notebook-based training run, still to be built. Full
 detail in `experiments/CHANGELOG.md`.
+
+## First official-model baseline (plan step 3, completed)
+
+Ran the real `gemma-4-31b-it-qat-w4a16-ct` model against the smoke cohort
+via a personal Kaggle notebook (`devtools/kaggle_notebooks/official_baseline_smoke.ipynb`).
+Two Kaggle-platform gotchas along the way, not code issues: the free/standard
+notebook GPU options (T4 x2, or whatever accelerator you land on) don't
+necessarily match the competition's actual 4x L4 hardware — a T4 run failed
+immediately (`bfloat16` needs compute capability ≥8.0; T4 is 7.5), and
+Kaggle blocks Internet + certain accelerators together on competition-attached
+notebooks (our notebook doesn't need internet — the wheelhouse is a
+pre-attached dataset — so disabling it is both safe and actually the
+harness's expected offline mode).
+
+**Real finding**: 3 of 4 tasks crashed with `litellm.ContextWindowExceededError`
+— `submission/configs/sampling.yaml`'s `max_output_tokens: 16384` reserves
+half the 32768-token context window on every turn, and real multi-turn
+conversations against the actual model (not the small `gemma4:e4b` stand-in,
+which never surfaced this in any prior run) grew past the remaining input
+budget by turn 8-10. Fixed: `max_output_tokens` 16384 → 8192, not yet
+re-validated (needs another Kaggle-notebook run). Full detail, including the
+exact error and per-task breakdown, in `experiments/CHANGELOG.md`.
+
+This is exactly why the scope caveat above the step 6 section exists — every
+proxy-model finding to date was validated only on a model that never grew
+its context enough to hit a real constraint that the actual competition
+model hits almost immediately.
