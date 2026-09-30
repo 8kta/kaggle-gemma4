@@ -88,12 +88,17 @@ def _src(lines: tuple[str, ...]) -> list[str]:
 
 def py_literal(text: str) -> str:
     """Render text as a Python triple-quoted string literal, safe for
-    embedding arbitrary file content (handles internal triple-quotes)."""
-    if '"""' not in text:
-        return f'"""{text}"""'
-    # Fall back to a quadruple-hash-delimited raw literal via chr-joining
-    # if the content ever contains triple double-quotes (none of our
-    # current files do, but this keeps the generator correct if they will).
+    embedding arbitrary file content. Backslashes are escaped
+    unconditionally — without this, any content containing a sequence
+    that looks like a Python string escape (e.g. JSON-escaped unicode
+    like \\ud83d\\udc77 from ensure_ascii=True, regex patterns like \\d,
+    Windows paths) gets reinterpreted by Python's own string-literal
+    parser instead of reproduced as literal text. Found via a real bug
+    in generate_lora_training_notebook.py: an embedded regex character
+    class containing \\uXXXX escapes formed an unpaired surrogate when
+    parsed, raising UnicodeEncodeError. submission/'s own files happen
+    to contain no backslashes, so this generator's prior output was
+    never actually affected — fixed here anyway for correctness."""
     escaped = text.replace("\\", "\\\\").replace('"""', '\\"\\"\\"')
     return f'"""{escaped}"""'
 

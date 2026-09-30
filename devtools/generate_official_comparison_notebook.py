@@ -87,9 +87,15 @@ def _src(lines: tuple[str, ...]) -> list[str]:
 
 def py_literal(text: str) -> str:
     """Render text as a Python triple-quoted string literal, safe for
-    embedding arbitrary file content (handles internal triple-quotes)."""
-    if '"""' not in text:
-        return f'"""{text}"""'
+    embedding arbitrary file content. Backslashes are escaped
+    unconditionally — without this, any content containing a sequence
+    that looks like a Python string escape (e.g. JSON-escaped unicode,
+    regex patterns like \\d, Windows paths) gets reinterpreted by
+    Python's own string-literal parser instead of reproduced as literal
+    text. Found via a real bug in generate_lora_training_notebook.py;
+    fixed here too even though submission/'s own files happen to
+    contain no backslashes (so this generator's prior output was never
+    actually affected)."""
     escaped = text.replace("\\", "\\\\").replace('"""', '\\"\\"\\"')
     return f'"""{escaped}"""'
 
