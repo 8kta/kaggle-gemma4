@@ -1322,3 +1322,25 @@ by walking each run's trace JSON.
   `TrainingArguments` cell).
 - Results dir: N/A.
 - Commit: see below.
+
+## 2026-09-30 — LoRA training notebook, bug #8: max_memory too tight broke loading
+- Hypothesis: N/A — bugfix, continuation of "Step 9 (part 2)" above. Bug
+  #7's `max_memory` tightening (`total-3GiB` → `total-6GiB`) was wrong —
+  it left too little room for the model's own weights, and `bitsandbytes`'
+  4-bit quantizer refuses CPU/disk offload without an explicit
+  `llm_int8_enable_fp32_cpu_offload=True` flag, raising `ValueError: Some
+  modules are dispatched on the CPU or the disk` immediately at
+  `from_pretrained()`.
+- Change: reverted `max_memory` to `total-3GiB` — now backed by two real
+  data points bracketing the actual per-GPU weight requirement: `total-3`
+  (~11.56GiB) is proven to load successfully (multiple prior runs got
+  past loading with this cap); `total-6` (~8.56GiB) doesn't even fit the
+  weights. Kept this round's other two changes (attention-only
+  `TARGET_MODULES`, non-reentrant gradient checkpointing) — those target
+  the actual training-time OOM from bug #7, which the cap-tightening
+  never got far enough to actually test before failing at load time.
+- Cohort: N/A.
+- Result: not yet confirmed — awaiting a re-run (fresh kernel restart,
+  since this touches the model-loading cell again).
+- Results dir: N/A.
+- Commit: see below.
