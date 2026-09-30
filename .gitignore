@@ -10,11 +10,13 @@ results/
 # not meant to live in git
 manual_kaggle_results/
 
-# Generated Kaggle notebooks (large — embed submission/'s full content
-# verbatim, duplicating what's already tracked there). Not committed; the
-# generator scripts (devtools/generate_official_*.py) are the source of
-# truth and regenerate these on demand.
-devtools/kaggle_notebooks/*.ipynb
+# No .ipynb ever, repo-wide — not just generated ones. Generated Kaggle
+# notebooks embed submission/'s full content verbatim (duplicating what's
+# already tracked there); the generator scripts (devtools/generate_official_*.py)
+# are the source of truth and regenerate them on demand. Broad *.ipynb
+# (not scoped to devtools/kaggle_notebooks/) so a notebook downloaded or
+# created anywhere else in the repo is never committed either.
+*.ipynb
 
 # Per-run trace/log/patch artifacts are large; keep only experiments/CHANGELOG.md
 # and any explicit per-run summary.json you choose to commit

@@ -300,16 +300,20 @@ caveats in `experiments/CHANGELOG.md`.
 > tested exclusively with `--fidelity proxy-model` (the `gemma4:e4b`
 > stand-in via Ollama) — treat every "clean completion" / "fix confirmed"
 > claim as *prompt-mechanics* evidence on a small stand-in model, not a
-> validated improvement on the actual competition model. Two official-model
-> runs now exist (2026-09-30, see step 3 above): the first crashed 3/4 tasks
-> on a `max_output_tokens` bug before exercising much of what's below; the
-> second, after the fix, ran clean — no crashes, one fully clean completion.
-> That confirms the *orchestration/config layer* works end-to-end on the
-> real model, but it's still only n=4 smoke-cohort tasks with
-> `resolution_rate=0/4` — steps 6-8's specific claims below (which prompt
-> fixes help, whether the skill/retrieval choices are right, etc.) are
-> still only validated on the stand-in, not on the real model at any
-> meaningful sample size.
+> validated improvement on the actual competition model. Three
+> official-model runs now exist (2026-09-30, see step 3 above): a 4-task
+> smoke run that crashed 3/4 on a `max_output_tokens` bug, a re-validation
+> of the fix (clean, `resolution_rate=0/4`), and a 19-task `comparison`
+> run — `resolution_rate=2/19 (10.5%)`, the project's first real
+> resolutions. That's real signal that **the current submission as a
+> whole** (this exact prompt, skill, and tool configuration) works on the
+> real model — but it is not a controlled test of steps 6-8's *individual*
+> claims below. None of the ablations that produced those claims (the
+> prompt-iteration rounds, the retrieval ablation's filesystem-only vs.
+> graph-first vs. hybrid comparison) have been re-run on the official
+> model — only the single current configuration has real-model data. Which
+> specific prior decisions are actually responsible for the 10.5%, versus
+> which might be neutral or even holding it back, is still unknown.
 
 `submission/` now has a real `agent.yaml` + `prompts/system.md` +
 `configs/sampling.yaml` — single `LlmAgent`, no sub-agents. The prompt
@@ -588,8 +592,21 @@ the fix. Zero `ContextWindowExceededError` crashes on any of the 4 tasks.
 `error=None`, the project's first-ever clean agent-loop completion on the
 real official model. Still `resolution_rate=0/4` (expected for a 4-task
 smoke sample), but the orchestration/config layer now demonstrably works
-end-to-end against the real model. Full detail, including the exact error
-and per-task breakdown for both runs, in `experiments/CHANGELOG.md`.
+end-to-end against the real model.
+
+**Scaled up to the `comparison` cohort (19 tasks) same day, via a separate
+notebook** (`devtools/generate_official_comparison_notebook.py`) —
+**`resolution_rate=2/19 (10.5%)`, the first task resolutions anywhere in
+this project**, proxy-model or official-model, both verified non-trivial
+(real patches, `test_exit_code=0`, not in the known zero-diff-resolves
+list). 16 of the remaining 17 tasks cleanly exhausted the 15-turn budget
+at *exactly* 14 tool calls each — suggesting the turn budget, not the
+tool-call budget, is the binding constraint right now. The
+`max_output_tokens=8192` fix reduced the context-window crash rate a lot
+(75% → 5.3% of tasks) but didn't eliminate it — one task still hit it on
+an unusually long trajectory. Full detail, including the exact error and
+per-task breakdown for all three official-model runs, in
+`experiments/CHANGELOG.md`.
 
 This is exactly why the scope caveat above the step 6 section exists — every
 proxy-model finding to date was validated only on a model that never grew

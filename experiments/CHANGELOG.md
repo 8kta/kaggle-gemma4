@@ -1042,3 +1042,48 @@ by walking each run's trace JSON.
 - Commit: `7ad5019be8e7a91f0777775b32566e6571812b47` (submission/ clean,
   confirmed via `diff -r` against the downloaded snapshot before ingesting).
 - MLflow: http://localhost:5001/#/experiments/9/runs/d146253fc73740d3ac70122a9c07efda
+
+## 2026-09-30 — 2026-09-30_official-comparison-v1 (first-ever task resolutions)
+- Hypothesis: First official-model run on the larger `comparison` cohort
+  (19 tasks, vs. the 4-task `smoke` sample). Does `resolution_rate` move
+  off 0, and does the `max_output_tokens=8192` fix (validated on smoke)
+  hold at this scale?
+- Change: none — same commit's submission as the smoke v2 validation run.
+- Cohort: comparison (19 tasks: 10 fastapi/fastapi, 2 psf/requests,
+  7 Textualize/rich), via Kaggle notebook
+  (`devtools/generate_official_comparison_notebook.py`), same budgets as
+  every prior official-model run (15 min / 25 tool calls / 15 turns),
+  concurrency=1.
+- Result: **`resolution_rate=2/19 (10.5%)` — the first task resolutions
+  anywhere in this project**, proxy-model or official-model. Both verified
+  non-trivial (not the known zero-diff-resolves anomaly, not in
+  `KNOWN_ANOMALOUS`): `fastapi_14492` (391-byte patch, `test_exit_code=0`,
+  12 tool calls, 100.2s, clean completion) and `rich_3518` (529-byte patch,
+  `test_exit_code=0`, 14 tool calls, 120.4s, clean completion).
+  - **16 of the remaining 17 tasks cleanly exhausted the 15-turn budget**
+    (no crash) — and strikingly, every single one used *exactly* 14 tool
+    calls before hitting the turn cap. That consistency suggests the
+    **turn budget, not the 25-tool-call budget, is the actual binding
+    constraint** for this model/prompt combination — worth testing
+    `max_turns` higher in a future round to see if more tasks would
+    resolve given more turns, independent of any prompt change.
+  - **The `max_output_tokens=8192` fix reduced but did not eliminate the
+    context-window crash**: `fastapi_14186` hit the identical
+    `ContextWindowExceededError` again — "requested 8192 output tokens
+    and your prompt contains at least 24577 input tokens" (24577+8192 =
+    32769 > 32768). Only 7 tool calls but 351.5s duration — a
+    verbose/long-thinking trajectory can still exhaust even the reduced
+    reservation. Frequency dropped from 3/4 (75%) on the smoke v1 run to
+    1/19 (5.3%) here — a real improvement, not a full fix. Candidate
+    follow-up: lower `max_output_tokens` further, or (better) investigate
+    whether thinking-token usage can be bounded more tightly per-turn
+    rather than shrinking the ceiling for every task uniformly.
+  - `errors: 17` in `summary.json` = 16 turn-budget-exhaustions + 1
+    context-window crash — same counting caveat as before, don't read it
+    as "17 crashes."
+- Results dir: N/A locally — ingested from
+  `manual_kaggle_results/extracted/results/results` via
+  `devtools/mlflow/ingest_results.py --cohort comparison`.
+- Commit: `4f8c05d05df5a5289b41f718524a5502b34787d6` (submission/ clean,
+  confirmed via `diff -r` against the downloaded snapshot before ingesting).
+- MLflow: http://localhost:5001/#/experiments/9/runs/904e7c404d464e12bd42cdb71b897594
