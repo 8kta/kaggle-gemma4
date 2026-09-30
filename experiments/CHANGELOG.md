@@ -1351,3 +1351,40 @@ by walking each run's trace JSON.
   fixed proactively before it becomes a real break in a future
   `transformers` version.
 - Commit: see below.
+
+## 2026-09-30 — LoRA training notebook, bug #9: OOM moved into attention itself
+- Hypothesis: N/A — bugfix, continuation of "Step 9 (part 2)" above. Bug
+  #8's revert (max_memory back to total-3, attention-only TARGET_MODULES
+  kept) got further — the OOM moved from `down_proj`'s LoRA forward to
+  `scaled_dot_product_attention` itself, inside the base model's own
+  `self_attn`, independent of LoRA. GPU 1: 13.85/14.56 GiB already
+  allocated before this specific call.
+- **Checked whether MAX_SEQ_LENGTH could go lower first, before touching
+  anything else**: computed the real per-length survival counts at finer
+  granularity. Found a hard floor — no training example is under ~3623
+  estimated tokens (the dataset simply doesn't have shorter examples), and
+  survival is a cliff: 0/44 at ≤3500, 10/44 at 3800, 20/44 at 4096.
+  Sequence-length reduction is not a viable lever anymore without
+  sacrificing all data, and we're already at the minimum useful length.
+- Change: added `optim='paged_adamw_8bit'` to `TrainingArguments` —
+  bitsandbytes' purpose-built fix for GPU memory that's momentarily too
+  tight, paging optimizer state to CPU RAM on demand. **Honesty check
+  before shipping this as a confident fix**: the crash is in the
+  *forward* pass of the very first training step, before any optimizer
+  state exists (PyTorch allocates optimizer state lazily on the first
+  `.step()` call, which comes after backward, which comes after this
+  forward pass) — so this fix may not address *this specific* crash
+  point, even though it's a reasonable thing to have in place regardless
+  for a later backward/optimizer-step OOM.
+- Cohort: N/A.
+- Result: not yet confirmed. Flagged explicitly to the user: we've now
+  pulled every code-level lever with real confidence behind it
+  (attention-only LoRA targeting, memory cap tuned via two real bracketing
+  data points, non-reentrant checkpointing, sequence length at its
+  floor), and the GPU is still essentially maxed out before backward pass
+  even starts. This may be a genuine hardware ceiling — 2x T4 (29 GiB
+  total) might not fit this 31B model's forward pass alone at the
+  sequence lengths the real training data requires, independent of
+  further tuning.
+- Results dir: N/A.
+- Commit: see below.
