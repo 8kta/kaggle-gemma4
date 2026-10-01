@@ -727,3 +727,29 @@ budget gets spent without reaching an edit. A fix for *that* looks
 different: a hard exploration-call budget forcing the root agent itself
 to commit to an edit, not a failure-triggered delegation gate. Full
 detail in `experiments/CHANGELOG.md`.
+
+## Filesystem-only submission: a real improvement (2026-10-01)
+
+Removed the 3 graph tools and the navigator entirely, following external
+review's recommendation after `30/30` observed `search_similar_code` calls
+returned empty across both prior official-model runs. Ran the same
+19-task `comparison`-cohort before/after test used throughout this
+investigation.
+
+**Result: `resolution_rate=3/19 (15.8%)`, up from `2/19`** — a real,
+verified improvement, not noise: a third task now resolves cleanly
+(`rich_3521`), the one recurring context-window crash (`fastapi_14186`)
+is gone, and three previously zero-patch tasks now produce real patches —
+directly confirming the hypothesis that budget previously spent on
+always-empty graph searches is now reaching real edits. Not a uniform
+win: 3 other tasks regressed to zero-patch (one picking up a *new*
+context-window crash, so the crash count didn't actually drop, it moved),
+and one task hit a new, not-yet-understood verification-phase error.
+Precise task-by-task diff in `experiments/CHANGELOG.md`.
+
+**Not promoted to champion yet.** `PROMOTION_CHECKLIST.md`'s gate 5
+(beat the champion on the `held_out` cohort) hasn't been run — this
+project has correctly never touched `held_out` so far, and the checklist
+explicitly says not to skip that check ("improved on the dev cohort" vs.
+"actually improved" are different claims). That's the next step if this
+candidate is worth formally promoting.

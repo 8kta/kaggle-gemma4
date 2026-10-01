@@ -1632,3 +1632,58 @@ either direction. The real test remains the planned official-model
 - Results dir: `results/2026-10-01_filesystem-only-test/`
 - Commit: `d710b57e2f17d5ed8579c618214f5f696ff5bd42` (dirty worktree at run time)
 - MLflow: http://localhost:5001/#/experiments/9/runs/8cb1c307b2a243d696f67a008e7b481d
+
+## 2026-10-01 — 2026-10-01_official-comparison-filesystem-only (real, mixed-but-net-positive result)
+- Hypothesis: Removing the 3 graph tools (30/30 observed calls returned
+  empty) and `navigator_agent` (no resolution gain, self-enforcement
+  failure) — does this recover the wasted exploration budget and improve
+  resolution rate vs. `2026-09-30_official-comparison-v1`
+  (`resolution_rate=2/19`)?
+- Change: `agent.yaml` tools 10→6 (dropped the 3 graph tools + the
+  navigator `agent_tool`), `system.md`'s graph-search guidance replaced
+  with direct `grep`/`find`, one stale `search_similar_code` mention
+  scrubbed from the `repo-navigation` skill's `fastapi.md`. Sampling and
+  all task budgets unchanged.
+- Cohort: comparison (19 tasks), official model, Kaggle notebook.
+- Result: **`resolution_rate=3/19 (15.8%)` — up from 2/19, a real,
+  verified improvement**, with a third task now resolving
+  (`rich_3521`, 480-byte patch, clean completion) that previously
+  exhausted its turn budget with zero patch. Precise task-by-task diff
+  against the original baseline (not navigator-v2, which was already
+  near-identical to it):
+  - **Improvements (5 tasks)**: `rich_3521` unresolved→**resolved**.
+    `fastapi_14186`'s `ContextWindowExceededError` crash is **gone**
+    (now a clean turn-budget exhaustion instead). Three previously
+    zero-patch tasks now produce real patches: `fastapi_14873` (0→2158
+    bytes), `fastapi_9753` (0→465 bytes), `fastapi_9425` (0→787 bytes) —
+    still unresolved, but confirms the hypothesis directly: budget
+    previously spent on always-empty graph searches is now reaching
+    `edit_file`/`write_file` on some tasks.
+  - **Regressions (3 tasks)**: `rich_3953` previously produced a 539-byte
+    patch (unresolved but a real attempt); now 0 patch **and** a new
+    `ContextWindowExceededError` on this task — the crash didn't
+    disappear overall, it moved. `fastapi_14953` (560→0 bytes) and
+    `rich_3468` (272→0 bytes) also regressed to zero-patch.
+  - **Ambiguous (1 task)**: `fastapi_14791`'s patch grew substantially
+    (578→2463 bytes) but hit a new, previously-unseen error type —
+    `Failed to apply test_patch: git apply ...` — a verification-phase
+    failure applying the gold test patch on top of the agent's own patch,
+    not a crash in the agent loop itself. Not yet understood; worth a
+    closer look in a future round, not chased here.
+  - **Unchanged (10 tasks)**: everything else — same resolved/unresolved
+    status, same (or absent) patch, same turn-budget-exhaustion ending.
+- **Honest takeaway**: not a uniform win — this redistributes where the
+  model spends its budget, helping some tasks and hurting others, net
+  positive on the headline number (+1 resolved, +3 tasks reaching a real
+  edit attempt) but with real, concrete costs on 3 other tasks. Consistent
+  with everything else observed in this project: changes rarely help
+  uniformly across a repo-diverse cohort. n=19, one trial — a second
+  resolution out of one previously-zero-patch task crossing the resolve
+  line is a meaningful signal, not yet a statistically overwhelming one.
+- Results dir: N/A locally — ingested from
+  `manual_kaggle_results/extracted/results/results` via
+  `devtools/mlflow/ingest_results.py --cohort comparison`.
+- Commit: `fe57fdd7828eeb8e86ebe18de9e8712cc7885f94` (submission/ clean,
+  confirmed via `diff -r` against the downloaded snapshot before
+  ingesting).
+- MLflow: http://localhost:5001/#/experiments/9/runs/a855d60a9afa4d6786436f57a3d40d92

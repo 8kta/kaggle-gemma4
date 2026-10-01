@@ -293,6 +293,16 @@ tasks.
   made to the shipping `submission/` (kept hybrid/optional) — small n,
   proxy-model only, re-validate on the official model before trusting this
   generalizes.
+  **Re-validated on the official model (2026-10-01)** — the proxy-model
+  signal held up: removing all 3 graph tools from the shipping submission
+  (they returned `{"results": [], "count": 0}` in all 30 observed official-
+  model calls across two runs) improved `resolution_rate` 2/19→3/19 on
+  the `comparison` cohort, with 3 more tasks newly reaching a real edit
+  attempt. Not a uniform win (3 tasks regressed) but net positive and
+  directly explained by the mechanism the smoke-cohort ablation predicted.
+  Change shipped to `submission/` — see `experiments/CHANGELOG.md`
+  "filesystem-only" entry. Not yet promoted to champion (held-out cohort
+  check still pending, see `experiments/PROMOTION_CHECKLIST.md`).
 
 ## 9. (Optional but likely needed for competitiveness) LoRA fine-tuning
 - Build SFT/RL training data from the 129 tasks (problem_statement → tool-call
