@@ -155,6 +155,16 @@ def build_notebook() -> dict:
             f"resolution-rate signal to inform the LoRA go/no-go decision, "
             f"not just an orchestration sanity check.",
             "",
+            "**This run includes the new `navigator_agent`** (read-only "
+            "context-isolation sub-agent, added after "
+            "`2026-09-30_official-comparison-v1` — see "
+            "`experiments/CHANGELOG.md`). That prior run is this run's "
+            "direct before/after baseline: same cohort, same budgets, same "
+            "everything except the navigator. `2026-09-30_official-comparison-v1` "
+            "results: `resolution_rate=2/19 (10.5%)`, 16/17 unresolved tasks "
+            "exhausted the turn budget — the exact pressure the navigator is "
+            "meant to relieve.",
+            "",
             "**Known-anomalous tasks in this cohort** (see `devtools/define_cohorts.py`'s "
             "`KNOWN_ANOMALOUS` — real public tasks, not excluded, just flagged):",
             *caveat_lines,
@@ -187,7 +197,7 @@ def build_notebook() -> dict:
             "```",
             "python3 devtools/mlflow/ingest_results.py \\",
             "  --results-dir <downloaded>/results \\",
-            "  --label <pick-a-label> \\",
+            "  --label 2026-10-01_official-comparison-navigator-v1 \\",
             "  --submission-snapshot <downloaded>/submission \\",
             f"  --git-commit {commit} \\",
             "  --backend gemma-4-31b-qat --env kaggle-notebook --fidelity official-model \\",
