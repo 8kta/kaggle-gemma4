@@ -53,7 +53,7 @@ COHORTS_PATH = REPO_DIR / "experiments" / "cohorts.json"
 # results are still safe in MLflow/CHANGELOG under
 # '2026-09-30_official-comparison-v1'). Bump VERSION_TAG for each new
 # variant generated from this script.
-VERSION_TAG = "navigator-v2"
+VERSION_TAG = "filesystem-only"
 OUT_PATH = REPO_DIR / "devtools" / "kaggle_notebooks" / f"official_baseline_comparison_{VERSION_TAG}.ipynb"
 
 # Same budgets as the smoke notebook — identical methodology, so this run's
@@ -164,19 +164,29 @@ def build_notebook() -> dict:
             f"resolution-rate signal to inform the LoRA go/no-go decision, "
             f"not just an orchestration sanity check.",
             "",
-            "**This run includes `navigator_agent` v2** (read-only, "
-            "2-tool, hard 2-3-call-budget context-isolation sub-agent — "
-            "tightened from the v1 design after external review found v1 "
-            "too permissive; see `experiments/CHANGELOG.md`'s "
-            "\"navigator_agent v2\" entry for the full revision history, "
-            "including a technical correction caught and verified against "
-            "ADK's own source before being applied). "
-            "`2026-09-30_official-comparison-v1` (pre-navigator) is this "
+            "**This run removes the 3 graph tools** "
+            "(`get_code_neighbors`/`search_similar_code`/`get_code_subgraph`) "
+            "and the navigator sub-agent entirely, keeping only "
+            "`run_command`/`read_file`/`edit_file`/`write_file`/`get_status`/"
+            "`submit_patch` plus the `repo-navigation` skill — the system "
+            "prompt's graph-search guidance is replaced with direct "
+            "`grep`/`find`. Motivated by real evidence, not guessing: across "
+            "the two prior official-model comparison-cohort runs "
+            "(`2026-09-30_official-comparison-v1`, "
+            "`2026-10-01_official-comparison-navigator-v2`), **all 30 "
+            "`search_similar_code` calls returned `{\"results\": [], "
+            "\"count\": 0}`** — including for generic queries like `class "
+            "FastAPI` against the FastAPI repo itself, suggesting the "
+            "graph/embedding data isn't functioning for these repos, not "
+            "just that it wasn't useful. The navigator was dropped "
+            "separately: official-model testing showed no resolution gain "
+            "(`resolution_rate=2/19`, identical to the pre-navigator "
+            "baseline) and a real self-enforcement failure (its own prompt "
+            "capped it at 3 tool calls; it made 8 on its one invocation). "
+            "See `experiments/CHANGELOG.md` for the full evidence behind "
+            "both removals. `2026-09-30_official-comparison-v1` is this "
             "run's direct before/after baseline: same cohort, same "
-            "budgets, same everything except the navigator. Its results: "
-            "`resolution_rate=2/19 (10.5%)`, 16/17 unresolved tasks "
-            "exhausted the turn budget — the exact pressure the navigator is "
-            "meant to relieve.",
+            "budgets, same everything except these two tool removals.",
             "",
             "**Known-anomalous tasks in this cohort** (see `devtools/define_cohorts.py`'s "
             "`KNOWN_ANOMALOUS` — real public tasks, not excluded, just flagged):",
@@ -210,7 +220,7 @@ def build_notebook() -> dict:
             "```",
             "python3 devtools/mlflow/ingest_results.py \\",
             "  --results-dir <downloaded>/results \\",
-            "  --label 2026-10-01_official-comparison-navigator-v2 \\",
+            "  --label 2026-10-01_official-comparison-filesystem-only \\",
             "  --submission-snapshot <downloaded>/submission \\",
             f"  --git-commit {commit} \\",
             "  --backend gemma-4-31b-qat --env kaggle-notebook --fidelity official-model \\",
@@ -453,9 +463,9 @@ def build_notebook() -> dict:
             "# Zip results + the exact submission/ that was evaluated, for easy download",
             "# and later `devtools/mlflow/ingest_results.py` ingestion.",
             "import shutil as _shutil",
-            "_shutil.make_archive(str(WORKING_DIR / 'official_baseline_comparison_results'), 'zip', root_dir=WORKING_DIR, base_dir='results')",
-            "_shutil.make_archive(str(WORKING_DIR / 'official_baseline_comparison_submission'), 'zip', root_dir=WORKING_DIR, base_dir='submission')",
-            "print('Wrote official_baseline_comparison_results.zip and official_baseline_comparison_submission.zip under /kaggle/working — download both.')",
+            f"_shutil.make_archive(str(WORKING_DIR / 'official_baseline_comparison_{VERSION_TAG}_results'), 'zip', root_dir=WORKING_DIR, base_dir='results')",
+            f"_shutil.make_archive(str(WORKING_DIR / 'official_baseline_comparison_{VERSION_TAG}_submission'), 'zip', root_dir=WORKING_DIR, base_dir='submission')",
+            f"print('Wrote official_baseline_comparison_{VERSION_TAG}_results.zip and official_baseline_comparison_{VERSION_TAG}_submission.zip under /kaggle/working — download both.')",
         ),
     ]
 
