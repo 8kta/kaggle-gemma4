@@ -1623,3 +1623,12 @@ either direction. The real test remains the planned official-model
   confirmed via `diff -r` against the downloaded snapshot before
   ingesting).
 - MLflow: http://localhost:5001/#/experiments/9/runs/e66d6528ada04227972d83d4d72b806d
+
+## 2026-10-01 — 2026-10-01_filesystem-only-test
+- Hypothesis: Filesystem-only root agent (navigator and graph tools removed entirely, skill kept) - matches comparison-v1's tool list minus the 3 graph tools that returned 0 results in every observed call. Does it compile and run correctly at runtime?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-10-01_filesystem-only-test/`
+- Commit: `d710b57e2f17d5ed8579c618214f5f696ff5bd42` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/8cb1c307b2a243d696f67a008e7b481d

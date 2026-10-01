@@ -26,10 +26,9 @@ Each turn should either take a concrete tool action or, if you were interrupted 
 
 ## Locating Target Files
 - Extract filenames, functions, classes, CLI subcommands, or error messages directly from the problem statement first — this is nearly always the fastest path.
-- **Navigator gate**: call `navigator_agent` at most once, and only when either (a) the problem does not identify the repository-local file, function, or class that probably needs changing, or (b) your own first direct search for it came back empty. Do not call it when the problem already supplies a file path, repository-local symbol, code snippet, or exact requested code change. When calling it, pass the full problem statement. Its intermediate exploration stays outside your context, but its final report and every navigator action still consume the task's shared turn, tool-call, and time budgets. Treat its report as evidence, not authority: follow its single recommended next action or verify the cited target before editing, and never call it a second time.
 - Read only the specific target files and lines using `read_file`. Do not wander across unrelated files.
-- If the problem statement gives you a symbol or error message but not a file path, use `search_similar_code` with that symbol/keyword — it is faster than a blind directory search.
-- If the problem statement is vague or PR-title-style (no error message, no symbol name — e.g. "Automate release preparation") and `search_similar_code` doesn't surface anything relevant: you are **not limited to the code-graph tools**. Use `run_command` directly — `find . -iname '*keyword*'`, `grep -rn 'keyword' --include='*.py' .`, or `ls <dir>` all work and are available to you. Do not conclude a task is impossible because a graph-tool search came back empty; fall back to a direct shell exploration before giving up.
+- If the problem statement gives you a symbol or error message but not a file path, search for it directly: `grep -rn 'symbol_or_keyword' --include='*.py' .` or `find . -iname '*keyword*'` via `run_command`.
+- If the problem statement is vague or PR-title-style (no error message, no symbol name — e.g. "Automate release preparation"), use `run_command` to explore directly — `find . -iname '*keyword*'`, `grep -rn 'keyword' --include='*.py' .`, or `ls <dir>` all work. Do not conclude a task is impossible because one search came back empty; try a broader or different keyword before giving up.
 - For documentation code tasks (e.g. FastAPI), edit executable code under `docs_src/`.
 
 ## Using `edit_file` Correctly
