@@ -1444,14 +1444,87 @@ of architecture. Ended via `Agent exceeded turns budget (15 turns)`, the
 same clean (non-crash) ending seen throughout proxy-model testing — not a
 new failure mode. `tool_calls=12` for a 660-byte patch is consistent with
 budget sharing correctly including the navigator's own calls (4 navigator
-+ 1 delegation call + 7 root-agent calls ≈ 12). One real operational hinge
-observed: the root agent wrote `scripts/prepare_release.sh` without
-execute permission, hit `Permission denied`, correctly self-diagnosed it
-("a common issue when creating...") and recovered via `chmod +x` —
-autonomous, no manual intervention needed.
++ 1 delegation call + 7 root-agent calls ≈ 12).
+
+**Correction (caught on closer trace review, not in the original writeup
+above)**: the `scripts/prepare_release.sh` approach was not just "a new
+strategy" — it was tried and failed. After the `chmod +x` self-recovery,
+re-running the script hit a real, unresolved Python traceback from
+`scripts/docs.py`. The agent then edited the script and re-ran it — same
+traceback, still unfixed. Its last action before running out of budget was
+starting to edit `scripts/test.sh` itself, which `system.md` explicitly
+forbids ("NEVER modify, create, or delete test files"). The correct framing
+is **mechanism validated, strategy benefit unproven**: real evidence the
+navigator's report changes the root agent's chosen direction, but no
+evidence yet that the resulting direction is better — this run shows it
+can also be wrong, just like any other exploration path.
 
 **Next**: this validates the mechanism works, not that it improves
 resolution rate — that needs a real comparison against the pre-navigator
 baseline on the same cohort (ideally the `comparison` cohort on the
 official model, where the actual context-window pressure this was built
 to relieve has been observed for real, not just estimated).
+
+## 2026-10-01 — navigator_agent v2: tighter scope, evidence-based report, real bugfix
+- Hypothesis: N/A — design refinement of the navigator built above, based
+  on external review of the v1 design against real comparison-v1 data
+  (13/19 zero-patch tasks, 4/6 non-zero-patch tasks still unresolved —
+  confirming a navigator can only address the navigation-failure category,
+  not implementation-failure) and the v1 proxy-test trace (its exploration
+  used 4 tool calls, over an unbounded budget; its 250-word-unbounded
+  report format risked eating root context the navigator was built to
+  save).
+- Change: three files.
+  1. `sub_agents/navigator.yaml`: tools reduced from 6 to 2
+     (`run_command`, `read_file` only — dropped `get_status` since the
+     navigator never edits so it's always a no-op call, dropped all 3
+     graph tools, dropped the `repo-navigation` skill since a 2-3-call
+     budget can't afford spending one on loading it).
+  2. `prompts/navigator.md`: rewritten — hard tool budget (target 2, max
+     3, stop immediately after), read-only `run_command` allowlist with
+     explicit banned operations (no `sed -i`/`chmod`/`rm`/`mv`/`cp`/git
+     writes/Python execution/test commands), a **defensive zero-tool-call
+     exit** for when the problem statement already specifies the target
+     (redundant safety net alongside the root-side gate, since neither
+     gate is perfectly reliable on a small model), evidence-only claims
+     (no inference from filenames/plausibility), and a 250-word report
+     format with explicit `Unknowns` and a confidence level instead of a
+     mandatory "root cause."
+  3. `prompts/system.md`: navigator gate tightened to mechanical criteria
+     — call at most once, only when the target is unknown OR the root
+     agent's own first direct search already came back empty (not "the
+     problem statement alone isn't enough," which was softer/vaguer).
+- **A real technical bug caught and fixed before implementing**: the
+  external review's first draft also proposed `include_contents: none` on
+  the navigator, reasoning it would stop root conversation history from
+  leaking into the navigator's context. Verified against ADK's actual
+  source before accepting this: `AgentTool.run_async`
+  (`google/adk/tools/agent_tool.py`) already creates a brand-new,
+  isolated `InMemorySessionService` + session per call, passing only the
+  request string — there is no root-history leakage to prevent. Worse,
+  `include_contents='none'`'s real behavior (`google/adk/flows/llm_flows/
+  contents.py`) restricts an agent to its own *current turn only*,
+  excluding history from its *own prior turns* — which would have made
+  the navigator forget its own earlier search/read results by the time it
+  reached the report step, directly undermining the tight call budget
+  this whole revision is built around. Dropped this one change; kept
+  `include_contents` at ADK's default. Confirmed via a real
+  `compile_submission()` check that the final config compiles with
+  `include_contents: default` and exactly the 2 intended tools.
+- **Also verified, not just accepted**: the graph-tool claim was checked
+  against the real comparison-v1 traces before being used as
+  justification — in all 10 observed `search_similar_code` calls across
+  the 19-task cohort, it was immediately followed by `run_command`. Real,
+  consistent pattern (worth citing precisely: the traces don't establish
+  whether this was a fallback from failure or routine complementary
+  lookup — graph search was never used alone to find an edit target in
+  this data).
+- Cohort: N/A — design/config change, not an eval iteration yet.
+- Result: compiles correctly (`navigator_agent` tools = `['run_command',
+  'read_file']`, `include_contents='default'`, confirmed via a real
+  `compile_submission()` call). Not yet re-tested at runtime (the v1
+  proxy-model smoke test validated the AgentTool mechanism itself, which
+  this change doesn't alter — only the navigator's own tool access,
+  prompt, and the root's gating criteria changed).
+- Results dir: N/A.
+- Commit: see below.

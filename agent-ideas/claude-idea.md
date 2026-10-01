@@ -238,6 +238,18 @@ tasks.
   only if its resolution gain on that cheap cohort justifies its added token and
   runtime cost; confirm the winner once on the official-model comparison cohort,
   not by running the full matrix on rented GPUs.
+  **Started (2026-10-01)** — built a read-only `navigator_agent`
+  (+analyzer equivalent), the concrete trigger being official-model
+  evidence (not just the cheap cohort): 16/17 unresolved comparison-cohort
+  tasks exhausted the turn budget. Went through a v1→v2 revision after
+  external review against the real comparison-v1 data and a proxy-model
+  smoke test — v2 scope: 2 tools only (`run_command`/`read_file`), hard
+  2-3-call budget, evidence-based report format. Compiles and the
+  delegation mechanism is verified working at runtime; the actual
+  resolution-gain comparison this bullet calls for (cheap cohort, then
+  confirm on official-model comparison cohort) is still pending. See
+  `experiments/CHANGELOG.md` "navigator_agent" entries and `README.md`'s
+  navigator section for full detail.
 
 ## 7. Prompt-engineering iteration loop
 - Tight loop: edit YAML/prompts → `swegemma eval --task-ids ... --max-tool-calls

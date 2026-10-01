@@ -689,4 +689,23 @@ same clean turn-budget-exhaustion seen throughout this project. This
 validates the mechanism works; whether it actually improves resolution
 rate still needs a real before/after comparison, ideally on the official
 model where the context pressure this targets has actually been observed.
-Full detail in `experiments/CHANGELOG.md`.
+**Correction on closer trace review**: the "new approach" the root agent
+took after delegating wasn't actually verified to work — it hit a real,
+unresolved error twice and its last action before running out of budget
+was starting to edit a test file (an explicit anti-pattern). Mechanism
+validated; strategy benefit unproven.
+
+**Tightened to v2** same day, after external review against the real
+comparison-v1 data (13/19 zero-patch tasks — a navigator can only help
+that category, not the 4 more tasks that produced real patches but still
+weren't resolved). Scope cut hard: 2 tools instead of 6 (`run_command`,
+`read_file` only — no graph tools, no skill, no `get_status`), a hard
+2-3-call budget, a defensive zero-tool-call exit for when it's delegated
+unnecessarily, and an evidence-based report format with explicit
+`Unknowns` instead of a mandatory "root cause." One proposed change
+(`include_contents: none`) was checked against ADK's actual source before
+accepting it and turned out to be wrong — `AgentTool` already isolates the
+navigator from root's history by construction, and that setting would
+have made the navigator forget its *own* earlier search results instead.
+Dropped. Full detail, including the exact ADK source checked, in
+`experiments/CHANGELOG.md`.

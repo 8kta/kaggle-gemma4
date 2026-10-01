@@ -1,14 +1,11 @@
 name: navigator_agent
-description: Read-only code navigation sub-agent. Locates the exact file(s), line range(s), and root cause for a problem statement, and reports back without editing anything.
+description: >-
+  Bounded read-only code locator. Use once only when the repository-local
+  target is unknown or one direct search failed. Pass the full problem
+  statement. Returns evidence and unknowns, not an authoritative patch plan.
 model: gemma-4-31b-it-qat-w4a16-ct
 instruction: !include ../prompts/navigator.md
 tools:
-  - read_file
   - run_command
-  - get_status
-  - search_similar_code
-  - get_code_neighbors
-  - get_code_subgraph
-skills:
-  - skills/repo-navigation
+  - read_file
 generate_content_config: !include ../configs/sampling.yaml
