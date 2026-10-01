@@ -656,3 +656,37 @@ training-time-only change, since the deployed adapter never goes through
 this module structure at inference. **Not yet confirmed working** — this
 fix is based on the error message alone (no local GPU to verify against)
 and awaiting a re-run. Full detail in `experiments/CHANGELOG.md`.
+
+## Navigator sub-agent: context isolation without training (plan step 6 revisit)
+
+Built the "simpler first version" of an externally-proposed architecture
+change: a read-only `navigator_agent` wrapped as an `AgentTool`
+(`skip_summarization: true`), added to the root agent alongside its
+existing 9 tools. This is a revisit of the Code Analyzer sub-agent step 6
+explicitly deferred ("revisit once step 7's prompt iteration clears the
+current operational issues") — it has, and the official-model comparison
+run gave the concrete trigger: 16/17 unresolved tasks exhausted the turn
+budget, and raising it alone just traded that failure for context-window
+crashes. The idea: let exploration happen in an isolated context that
+never pollutes the root agent's own, so the same budget covers more real
+work before hitting the context ceiling.
+
+Verified every harness capability claim behind this (`SequentialAgent`,
+`output_key`, `include_contents`, the `AgentTool` isolation pattern) against
+`docs/HARNESS_README.md` before building anything — all accurate. Also
+checked something the external proposal didn't address: the task's tool-
+call/turn budget lives on one object shared across the whole agent tree,
+so a navigator doesn't grant extra total budget — it spends the same
+ceiling across isolated context windows instead of one accumulating one.
+
+**Verified working, not just compiling**: a real `compile_submission()`
+check confirmed the wiring, and a real proxy-model run showed the root
+agent delegating to the navigator as its first action, getting back a
+structured report, and — confirmed directly in its own reasoning trace —
+acting on that report to take a genuinely new approach never seen on this
+task before. Not resolved (expected for the stand-in model), ended via the
+same clean turn-budget-exhaustion seen throughout this project. This
+validates the mechanism works; whether it actually improves resolution
+rate still needs a real before/after comparison, ideally on the official
+model where the context pressure this targets has actually been observed.
+Full detail in `experiments/CHANGELOG.md`.

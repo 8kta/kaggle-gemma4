@@ -1388,3 +1388,70 @@ by walking each run's trace JSON.
   further tuning.
 - Results dir: N/A.
 - Commit: see below.
+
+## 2026-10-01 — 2026-09-30_navigator-test
+- Hypothesis: Does the new navigator_agent AgentTool (read-only, isolated context, skip_summarization) actually get invoked and function correctly at runtime, not just compile?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-09-30_navigator-test/`
+- Commit: `6e024accebc578028fda2cd3ddb9a90dbee0ce74` (dirty worktree at run time)
+- MLflow: http://localhost:5001/#/experiments/9/runs/b307827b509a4196ae3d4542bc23b910
+
+### Analysis addendum — navigator_agent architecture validated at runtime
+Built per the pasted external proposal's "simpler first version" (verified
+against `docs/HARNESS_README.md` before building: `SequentialAgent`,
+`output_key`, `include_contents`, and the `AgentTool
+(skip_summarization: true)` isolation pattern at line 668 all checked out
+exactly as cited). Also verified the budget-sharing nuance the proposal
+didn't address: `SwegemmaContext.check_budget()` tracks `tool_calls_used`/
+`llm_calls_used` on one object per task, shared across the whole agent
+tree — a navigator sub-agent does NOT grant extra total budget, it spends
+the same pooled ceiling across isolated context windows instead of one
+accumulating one.
+
+Added `submission/sub_agents/navigator.yaml` (read-only: `read_file`,
+`run_command`, `get_status`, the 3 graph tools, `repo-navigation` skill —
+no `edit_file`/`write_file`/`submit_patch`) and
+`submission/prompts/navigator.md` (mandatory anti-repetition check +
+mechanical exploration steps + a fixed report format: relevant file(s),
+root cause, suggested fix, suggested verification — mirroring this
+project's established finding that mechanical framing works better than
+soft framing for the stand-in model). Wired into the root agent as a 10th
+tool (`agent_tool: {config_path: sub_agents/navigator.yaml,
+skip_summarization: true}`), mentioned once in `system.md` as optional —
+same framing the repo-navigation skill already uses, consistent with the
+step-8 finding that making an extra step *mandatory* backfired.
+
+**Verified in two stages, not just written**: (1) a real
+`compile_submission()` dry-run confirmed the navigator compiles correctly
+as an `AgentTool` alongside the 9 direct tools and the skill toolset. (2)
+A real proxy-model run on `fastapi_15661` (the most-tested task in this
+project) confirmed it actually works at runtime: the root agent delegated
+to `navigator_agent` as its very first action (43.8s in), the navigator
+explored independently in its own isolated context (4 read/list calls,
+~106s) and returned a report in exactly the specified format, and —
+critically — **the root agent's own reasoning explicitly referenced "the
+navigator_agent's findings"** and took a genuinely new approach never seen
+on this task before (`scripts/prepare_release.sh`, vs. every prior run's
+README-edit or `fastapi/__init__.py` version-bump attempts). Real evidence
+the delegation actually changes the root agent's strategy, not just adds
+overhead.
+
+Not resolved (`resolved=false`, `test_exit_code=2`) — expected, the
+`gemma4:e4b` stand-in has never resolved a task in this project regardless
+of architecture. Ended via `Agent exceeded turns budget (15 turns)`, the
+same clean (non-crash) ending seen throughout proxy-model testing — not a
+new failure mode. `tool_calls=12` for a 660-byte patch is consistent with
+budget sharing correctly including the navigator's own calls (4 navigator
++ 1 delegation call + 7 root-agent calls ≈ 12). One real operational hinge
+observed: the root agent wrote `scripts/prepare_release.sh` without
+execute permission, hit `Permission denied`, correctly self-diagnosed it
+("a common issue when creating...") and recovered via `chmod +x` —
+autonomous, no manual intervention needed.
+
+**Next**: this validates the mechanism works, not that it improves
+resolution rate — that needs a real comparison against the pre-navigator
+baseline on the same cohort (ideally the `comparison` cohort on the
+official model, where the actual context-window pressure this was built
+to relieve has been observed for real, not just estimated).
