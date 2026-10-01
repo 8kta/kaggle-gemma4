@@ -45,7 +45,16 @@ from pathlib import Path
 REPO_DIR = Path(__file__).resolve().parent.parent
 SUBMISSION_DIR = REPO_DIR / "submission"
 COHORTS_PATH = REPO_DIR / "experiments" / "cohorts.json"
-OUT_PATH = REPO_DIR / "devtools" / "kaggle_notebooks" / "official_baseline_comparison.ipynb"
+# Versioned per submission variant (not overwritten) so each tested config's
+# exact notebook stays around — notebooks are gitignored, so a reused
+# filename would silently lose the previous variant's file on regeneration
+# (the prior "official_baseline_comparison.ipynb" for the pre-navigator
+# baseline was lost this way before this convention started; its real
+# results are still safe in MLflow/CHANGELOG under
+# '2026-09-30_official-comparison-v1'). Bump VERSION_TAG for each new
+# variant generated from this script.
+VERSION_TAG = "navigator-v2"
+OUT_PATH = REPO_DIR / "devtools" / "kaggle_notebooks" / f"official_baseline_comparison_{VERSION_TAG}.ipynb"
 
 # Same budgets as the smoke notebook — identical methodology, so this run's
 # numbers are directly comparable to the smoke-cohort results already logged.
@@ -155,13 +164,17 @@ def build_notebook() -> dict:
             f"resolution-rate signal to inform the LoRA go/no-go decision, "
             f"not just an orchestration sanity check.",
             "",
-            "**This run includes the new `navigator_agent`** (read-only "
-            "context-isolation sub-agent, added after "
-            "`2026-09-30_official-comparison-v1` — see "
-            "`experiments/CHANGELOG.md`). That prior run is this run's "
-            "direct before/after baseline: same cohort, same budgets, same "
-            "everything except the navigator. `2026-09-30_official-comparison-v1` "
-            "results: `resolution_rate=2/19 (10.5%)`, 16/17 unresolved tasks "
+            "**This run includes `navigator_agent` v2** (read-only, "
+            "2-tool, hard 2-3-call-budget context-isolation sub-agent — "
+            "tightened from the v1 design after external review found v1 "
+            "too permissive; see `experiments/CHANGELOG.md`'s "
+            "\"navigator_agent v2\" entry for the full revision history, "
+            "including a technical correction caught and verified against "
+            "ADK's own source before being applied). "
+            "`2026-09-30_official-comparison-v1` (pre-navigator) is this "
+            "run's direct before/after baseline: same cohort, same "
+            "budgets, same everything except the navigator. Its results: "
+            "`resolution_rate=2/19 (10.5%)`, 16/17 unresolved tasks "
             "exhausted the turn budget — the exact pressure the navigator is "
             "meant to relieve.",
             "",
@@ -197,7 +210,7 @@ def build_notebook() -> dict:
             "```",
             "python3 devtools/mlflow/ingest_results.py \\",
             "  --results-dir <downloaded>/results \\",
-            "  --label 2026-10-01_official-comparison-navigator-v1 \\",
+            "  --label 2026-10-01_official-comparison-navigator-v2 \\",
             "  --submission-snapshot <downloaded>/submission \\",
             f"  --git-commit {commit} \\",
             "  --backend gemma-4-31b-qat --env kaggle-notebook --fidelity official-model \\",
