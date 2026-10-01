@@ -238,18 +238,27 @@ tasks.
   only if its resolution gain on that cheap cohort justifies its added token and
   runtime cost; confirm the winner once on the official-model comparison cohort,
   not by running the full matrix on rented GPUs.
-  **Started (2026-10-01)** — built a read-only `navigator_agent`
-  (+analyzer equivalent), the concrete trigger being official-model
-  evidence (not just the cheap cohort): 16/17 unresolved comparison-cohort
-  tasks exhausted the turn budget. Went through a v1→v2 revision after
-  external review against the real comparison-v1 data and a proxy-model
-  smoke test — v2 scope: 2 tools only (`run_command`/`read_file`), hard
-  2-3-call budget, evidence-based report format. Compiles and the
-  delegation mechanism is verified working at runtime; the actual
-  resolution-gain comparison this bullet calls for (cheap cohort, then
-  confirm on official-model comparison cohort) is still pending. See
-  `experiments/CHANGELOG.md` "navigator_agent" entries and `README.md`'s
-  navigator section for full detail.
+  **Done (2026-10-01)** — built a read-only `navigator_agent` (+analyzer
+  equivalent), the concrete trigger being official-model evidence (not
+  just the cheap cohort): 16/17 unresolved comparison-cohort tasks
+  exhausted the turn budget. Went through a v1→v2 revision after external
+  review, then ran the real official-model comparison-cohort before/after
+  test this bullet calls for. **Result: no resolution gain** —
+  `resolution_rate=2/19`, numerically identical to the pre-navigator
+  baseline (same 2 tasks resolved, same context-window crash). The
+  navigator fired exactly once across 19 tasks and didn't change that
+  task's outcome either — not a broken mechanism (verified working
+  multiple times), but a gate built around the wrong failure model. Real
+  finding: most turn-exhausted tasks spent nearly their whole budget
+  exploring and never reached `edit_file` even once — navigation that
+  never technically *fails* (so the gate never fires), it just never
+  *converges*. Per the plan's own rule ("keep a sub-agent only if its
+  resolution gain justifies its cost"), this evidence doesn't justify
+  keeping it as-is — decision on reverting vs. redesigning pending. The
+  real fix this points to looks different: a hard exploration-call
+  budget on the root agent itself, not a failure-triggered delegation
+  gate. See `experiments/CHANGELOG.md` "navigator_agent" entries and
+  `README.md`'s navigator section for full detail.
 
 ## 7. Prompt-engineering iteration loop
 - Tight loop: edit YAML/prompts → `swegemma eval --task-ids ... --max-tool-calls

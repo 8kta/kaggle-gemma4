@@ -1571,3 +1571,55 @@ win or loss for the navigator specifically. n=1 per configuration on one
 task — not enough to conclude anything about resolution-rate impact
 either direction. The real test remains the planned official-model
 `comparison`-cohort before/after run.
+
+## 2026-10-01 — 2026-10-01_official-comparison-navigator-v2 (navigator rarely triggers; real failure mode identified)
+- Hypothesis: Before/after test of `navigator_agent` v2 against
+  `2026-09-30_official-comparison-v1` (pre-navigator baseline,
+  `resolution_rate=2/19`). Does the navigator improve resolution rate or
+  reduce turn-budget exhaustion on the `comparison` cohort?
+- Change: none to the submission other than the navigator itself — same
+  commit lineage, same cohort, same budgets as the baseline.
+- Cohort: comparison (19 tasks), official model, Kaggle notebook.
+- Result: **`resolution_rate=2/19 (10.5%)` — numerically identical to the
+  pre-navigator baseline**, and the match goes deeper than the aggregate:
+  the *same two tasks* resolved (`fastapi_14492`, `rich_3518`, same patch
+  sizes 391/529 bytes), and the *same task* hit the context-window crash
+  (`fastapi_14186`). Root cause: **the navigator was invoked exactly once
+  across all 19 tasks** (`fastapi_9425`), and even there it didn't change
+  the outcome (still unresolved, still zero patch). This isn't a failure
+  of the navigator mechanism — it works when called (confirmed repeatedly
+  now) — it's that the gate essentially never fires on the official model.
+- **Why the gate almost never fires — a real, more precise finding than
+  either the original navigator design or the external review assumed**:
+  categorized every task's tool-call sequence into explore
+  (`read_file`/`run_command`/graph tools) vs. implement
+  (`edit_file`/`write_file`). Most turn-budget-exhausted tasks spent
+  **13-15 of their 14-15 total calls purely exploring**, several (
+  `fastapi_14099`, `fastapi_14246`, `fastapi_14266`, `rich_3777`) used
+  **all 15 calls exploring and never called `edit_file`/`write_file`
+  even once**. The navigator's gate ("target unknown OR your own first
+  direct search already came back empty") is framed around a
+  binary-failure model of navigation — but the real pattern here is
+  **unbounded exploration that never technically fails, it just never
+  converges**: `run_command`/`read_file` calls keep returning real
+  results, so the gate's "search came back empty" condition is never
+  true, even though the agent is burning its entire budget without ever
+  reaching an edit. A navigator built to catch "I don't know where to
+  look" doesn't address "I keep looking and never decide I've looked
+  enough."
+- **This reframes, not contradicts, the external review's own prediction**
+  that a navigator "cannot repair implementation/reproduction loops" —
+  the actual dominant pattern here is upstream of that: most tasks never
+  even reach implementation, let alone loop within it. The fix this
+  points to is different from what v2 built: not "delegate when search
+  fails" but something like a hard exploration-call budget before the
+  *root* agent itself (not a sub-agent) is forced to commit to an edit —
+  closer to a mechanical turn-based gate than a failure-based one.
+- Cohort: comparison.
+- Results dir: N/A locally — ingested from
+  `manual_kaggle_results/extracted/results/results` via
+  `devtools/mlflow/ingest_results.py --cohort comparison`.
+- Commit: `cc25d36a38580d7181a73d03e81587067263b53f` (submission/ clean,
+  confirmed via `diff -r` against the downloaded snapshot before
+  ingesting).
+- MLflow: http://localhost:5001/#/experiments/9/runs/e66d6528ada04227972d83d4d72b806d

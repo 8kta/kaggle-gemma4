@@ -707,5 +707,23 @@ unnecessarily, and an evidence-based report format with explicit
 accepting it and turned out to be wrong — `AgentTool` already isolates the
 navigator from root's history by construction, and that setting would
 have made the navigator forget its *own* earlier search results instead.
-Dropped. Full detail, including the exact ADK source checked, in
-`experiments/CHANGELOG.md`.
+Dropped.
+
+**The real official-model before/after result (2026-10-01)**:
+`resolution_rate=2/19 (10.5%)` — numerically identical to the
+pre-navigator baseline, down to the *same two tasks* resolving and the
+*same task* hitting the context-window crash. The navigator was invoked
+exactly once across all 19 tasks, and even there didn't change the
+outcome — not a mechanism failure (it works when called), but the gate
+essentially never fires. Categorizing every task's tool-call sequence
+(explore vs. implement) found why: most turn-exhausted tasks spent
+13-15 of 14-15 total calls purely exploring, several used all 15 calls
+exploring and never called `edit_file`/`write_file` once. The gate
+("target unknown OR first search came back empty") assumes navigation
+*fails*; the real pattern is navigation that never technically fails, it
+just never converges — `run_command`/`read_file` keep returning real
+results, so "search came back empty" is never true even while the whole
+budget gets spent without reaching an edit. A fix for *that* looks
+different: a hard exploration-call budget forcing the root agent itself
+to commit to an edit, not a failure-triggered delegation gate. Full
+detail in `experiments/CHANGELOG.md`.
