@@ -1528,3 +1528,46 @@ to relieve has been observed for real, not just estimated).
   prompt, and the root's gating criteria changed).
 - Results dir: N/A.
 - Commit: see below.
+
+## 2026-10-01 — 2026-10-01_navigator-v2-test
+- Hypothesis: navigator_agent v2 (2 tools, hard 2-3-call budget, evidence-based report, defensive zero-tool exit). Does it stay within 3 tool calls, avoid proposing an unsupported implementation, and leave the root agent enough turns to edit/test/submit?
+- Change: `swegemma eval --sandbox docker` against task(s) fastapi_15661, backend=stand-in-e4b, env=local-mac, fidelity=proxy-model.
+- Cohort: smoke
+- Result: proxy_resolution_rate=0.0, resolved=0/1
+- Results dir: `results/2026-10-01_navigator-v2-test/`
+- Commit: `b32c32eb30d2c4136afe44a7cafc79bf1c4e4625`
+- MLflow: http://localhost:5001/#/experiments/9/runs/4b5da75e81d240b49c21942c675dd72d
+
+### Analysis addendum — navigator v2 not invoked; honest result either way
+**The navigator was never called in this run.** The stricter gate ("only
+when the target is unknown OR your own first direct search already came
+back empty") meant the root agent kept trying its own direct exploration
+(5 read/list calls: `publish.yml`, `ls`, `pyproject.toml`, `README.md`,
+`publish.yml` again) rather than falling back — on this genuinely vague,
+PR-title-style task, it apparently judged its own search "good enough" at
+each step, never hitting the fallback condition clearly enough to
+delegate. This run does not test the delegation mechanism (v1's test
+already did that); it tests whether the *tightened gate* leaves the
+navigator under-used on a task that plausibly could have benefited from
+it.
+
+Result: a third distinct approach on this exact task (after the
+README-edit, version-bump, and shell-script attempts in prior runs) —
+edited `.github/workflows/publish.yml` to add a "Bump version and tag"
+step, 882-byte patch, `error=null` (clean completion, 11/15 turns, 9/25
+tool calls — efficient). **But it never ran any test before calling
+`submit_patch`** — no `pytest` call anywhere in the trace, violating its
+own Operating Loop's Verify step. `test_exit_code=2` (collection error),
+unresolved. This echoes the v1 test's finding from a different angle:
+whether or not the navigator is invoked, this specific task keeps
+producing agent trajectories that skip real verification — a reasoning/
+discipline gap orthogonal to the navigator entirely, not something this
+architecture change was built to fix.
+
+**Honest takeaway**: two tests, two different navigator-trigger outcomes
+(v1: invoked, led to a failed shell-script approach; v2: not invoked, led
+to an unverified-but-submitted edit), neither resolved, neither a clean
+win or loss for the navigator specifically. n=1 per configuration on one
+task — not enough to conclude anything about resolution-rate impact
+either direction. The real test remains the planned official-model
+`comparison`-cohort before/after run.
