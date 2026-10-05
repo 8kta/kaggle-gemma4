@@ -1687,3 +1687,33 @@ either direction. The real test remains the planned official-model
   confirmed via `diff -r` against the downloaded snapshot before
   ingesting).
 - MLflow: http://localhost:5001/#/experiments/9/runs/a855d60a9afa4d6786436f57a3d40d92
+
+## 2026-10-05 — 2026-10-05_official-comparison-filesystem-only-wordingfix (re-run; not the same candidate)
+- Hypothesis: re-run of the filesystem-only candidate to check whether the
+  3/19 result holds. This is NOT byte-identical to the Oct 1 run: commit
+  `a8f2d9a` changed the Reproduce wording in `prompts/system.md` (no more
+  "write to /tmp" via write_file). Treat as a re-run with one prompt-wording
+  difference, not a pure reproduction.
+- Cohort: comparison (19 tasks), official model, Kaggle notebook.
+- Result: `resolution_rate=4/19 (21.1%)` (Oct 1 run: 3/19).
+  - Resolved: `fastapi_14492`, `rich_3518` (both resolved in every run so
+    far), `fastapi_14873` (new), `fastapi_9753` (new).
+  - Dropped vs Oct 1: `rich_3521` (resolved Oct 1, turn budget this run).
+  - Changed errors: `rich_3953` no longer has the ContextWindowExceeded
+    crash (now a turn-budget exhaustion with an 846-byte patch). Zero
+    traces contain ContextWindowExceeded this run.
+  - Still present: `fastapi_14791` "Failed to apply test_patch" (2563-byte
+    patch), the verification-harness error seen Oct 1.
+- Interpretation: the candidate moved 3 -> 4 but the solved set changed by
+  two tasks in each direction. With one run per candidate and a wording
+  change confounding it, this is consistent with run-to-run variance plus
+  a small real effect. Not enough to claim a stable improvement.
+- Provenance: the notebook header says `d40b23f` because it was generated
+  from a dirty worktree (the generator embeds HEAD, not the committed
+  content). The submission snapshot was verified byte-for-byte against
+  `a8f2d9a` (`git archive` + `diff -r`), so `a8f2d9a` is the correct
+  --git-commit for ingestion, not the header value.
+- Not promoted: held-out gate (PROMOTION_CHECKLIST gate 5) still not run.
+- Results dir: N/A locally (ingested from manual_kaggle_results).
+- Commit: `a8f2d9a` (verified against the snapshot).
+- MLflow: http://localhost:5001/#/experiments/9/runs/aa8fde5f105f48c6a6d5470dae98d3ad
