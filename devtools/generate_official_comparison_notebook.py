@@ -72,7 +72,7 @@ def git_commit() -> str:
 
 def git_dirty() -> bool:
     status = subprocess.run(
-        ["git", "-C", str(REPO_DIR), "status", "--porcelain"],
+        ["git", "-C", str(REPO_DIR), "status", "--porcelain", "--", "submission", "devtools"],
         capture_output=True, text=True, check=True,
     ).stdout
     return bool(status.strip())
