@@ -37,7 +37,9 @@ def code(*lines: str) -> dict:
 
 def build_notebook() -> dict:
     base = comparison.build_notebook()
-    setup_cells = [base["cells"][i] for i in SETUP_CELL_INDICES]
+    setup_cells = [base["cells"][i] for i in SETUP_CELL_INDICES[:-2]]
+    setup_cells.append(code("from pathlib import Path", "AGENT_DIR = Path('/kaggle/working/submission')"))
+    setup_cells += [base["cells"][i] for i in SETUP_CELL_INDICES[-2:]]
 
     diagnosis_cells = [
         md(
