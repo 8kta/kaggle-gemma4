@@ -1799,3 +1799,11 @@ either direction. The real test remains the planned official-model
 - Cause (strongly suggested, not yet confirmed): `devtools/generate_*_notebook.py` installs the wheelhouse by its unversioned Kaggle path, which resolves to the latest dataset version on Kaggle. The local copy is version 25, so the Kaggle build is probably newer.
 - Impact: all official-model runs (comparison-v1, navigator-v2, filesystem-only, filesystem-only re-run) used this Kaggle build. The graph-tool conclusions and the local-dry-run analysis describe version 25, not what ran in the official runs.
 - Next: cell A0 prints the installed swegemma version and the wheelhouse listing. Paste its output. Then pin the notebooks to a specific wheelhouse version, and re-check the graph tool on that build.
+
+## 2026-10-05 — confirmed: Kaggle swegemma build differs from local wheel
+- Kaggle A0: swegemma 0.2.7 installed at `/usr/local/lib/python3.12/dist-packages`, `resolve_node_name` missing. Python 3.12.13.
+- Kaggle wheel sha256 `27a2f60f8db46c8fef5defc16df722dac0402446c9a6252e7e6b4c280e843c81`, installed `graph_utils.py` sha256 `e48d9f0cabe02e9ce8b1a0ab437de68a90e0a740b61a3f54ce5a95ab1f05c1cc`.
+- Local wheelhouse v25 sha256 `2b74d402dc95a615f3b36c56fd3f9ba11ddbfb7db8a5a32ec259369a0f559d98`, installed `graph_utils.py` sha256 `b41439734ee0838acc7ae867b4718e9175bfea56830c4050e7789b4a0b713dcb`. Local Python 3.13.5.
+- Conclusion: same version string, different build. The mounted Kaggle wheelhouse is not the version-25 dataset I downloaded.
+- Official-run logs in `manual_kaggle_results` contain no "Could not obtain embedding" text. That is inconclusive: the warning went to notebook stderr, not per-task logs.
+- Open: which wheelhouse dataset version Kaggle mounts (dataset page), and whether all official runs used the same mounted build. Future notebooks should print the wheel sha256 in every run.
