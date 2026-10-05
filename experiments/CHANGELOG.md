@@ -1749,3 +1749,45 @@ either direction. The real test remains the planned official-model
   queries directly against those paths.
 - Status: diagnosis only; no change to `submission/` or the notebooks.
   Uncommitted.
+
+## 2026-10-05 — graph lookup debug notebook (built, locally dry-run; not yet run on Kaggle)
+- Added `graph_dir` debug cell (section 5b) to the comparison generator, and
+  bumped its VERSION_TAG to `filesystem-only-graphdebug` so the notebook that
+  already ran is not overwritten. The submission is unchanged (no graph tools).
+- Added `devtools/generate_graph_debug_notebook.py` → `graph-lookup-debug-v1.ipynb`.
+  CPU-only: reuses the comparison setup cells, then calls the real
+  `search_similar_code` tool on the four failing tasks with each task's own
+  base commit, plus a relative-`data/graphs` failure-mode check.
+- Local dry run against the downloaded competition data (same cell code,
+  Kaggle paths replaced):
+  - `get_openapi` (fastapi_14246), `response_model` (fastapi_9425), and
+    `Segment.split_cells` (rich_3521) each return 3 results.
+  - `openapi security` (fastapi_14266) returns 0: phrase queries never resolve.
+  - **The relative-`data/graphs` check did NOT reproduce empties.** With no
+    `data/graphs` in the CWD the tool still returned results. The
+    auto-detection hypothesis from the previous entry is therefore not
+    supported by this local run. The official-run empties are still unexplained.
+- Next: run `graph-lookup-debug-v1.ipynb` on Kaggle. If the in-run results
+  are empty again, the difference is inside the harness context, and the
+  printed output of cells A and B is what will show it.
+- Uncommitted: this CHANGELOG entry only (generator and notebook changes are in `7d4ac36`).
+
+## 2026-10-05 — graph-lookup debug notebook: first Kaggle run
+- Kaggle `graph_debug_results.json`: all four failing queries returned
+  `status: ok, count: 0`, identical to the official comparison run. The notebook
+  passed the competition `graphs/` and `embeddings/` paths explicitly, so path
+  resolution is not the cause.
+- Local .venv has the same swegemma version as the wheelhouse (0.2.7), and
+  every layer works locally: the npz loads (3619 entries), the graph loads,
+  `get_openapi` resolves to `fastapi.openapi.utils.get_openapi`, and embed returns
+  a (256,) vector.
+- Code path explaining silent empties: `embedding_utils.load_embeddings_from_npz`
+  failures are caught in `_REPO_CACHES` population and only logged with
+  `logger.warning`. An empty cache makes `embed()` return None, and
+  `get_similar_nodes` returns `[]`, which the tool reports as `status: ok`.
+  Unresolved: which layer fails on Kaggle.
+- Added cell B2 (layer-by-layer): npz load, graph load, resolve, embed,
+  each printed separately. Local dry run passes every step.
+- Next: run the regenerated `graph-lookup-debug-v1.ipynb` on Kaggle and paste
+  cells A, B, and B2 output, including any `Failed to load embeddings` warning
+  printed to stderr.
