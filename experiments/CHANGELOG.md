@@ -1807,3 +1807,25 @@ either direction. The real test remains the planned official-model
 - Conclusion: same version string, different build. The mounted Kaggle wheelhouse is not the version-25 dataset I downloaded.
 - Official-run logs in `manual_kaggle_results` contain no "Could not obtain embedding" text. That is inconclusive: the warning went to notebook stderr, not per-task logs.
 - Open: which wheelhouse dataset version Kaggle mounts (dataset page), and whether all official runs used the same mounted build. Future notebooks should print the wheel sha256 in every run.
+
+## 2026-10-05 — root cause: wheelhouse v28 graph lookup defect; official runs used v28
+- Kaggle mounts the latest wheelhouse, dataset version 28. Downloaded it with
+  kagglehub: swegemma wheel sha256 `27a2f60f8db46c8fef5defc16df722dac0402446c9a6252e7e6b4c280e843c81`,
+  matching Kaggle exactly. Our local analysis used version 25 (`2b74d402…`).
+- v28 changes 10 swegemma files relative to v25, including `tools/graph.py`,
+  `tools/base.py`, `tools/execution.py`, `tools/workspace.py`, and `context.py`.
+- Running the four failing queries against the extracted v28 code reproduces the
+  Kaggle output exactly: `status: ok, count: 0` and the `Could not obtain embedding`
+  warning. v28's `graph_utils` has no `resolve_node_name`, so bare names and phrases
+  never resolve to a node, and the embedding lookup fails silently.
+- The official traces contain `is_truncated` in all search results. v25 never
+  produces that field (0 matches in its `tools/graph.py`). So the official runs used
+  the v28 build.
+- Consequence: the 30/30 empty `search_similar_code` results came from a build
+  defect in v28, not from the graph approach. The earlier conclusion that graph
+  retrieval doesn't help is unsupported. Removing the graph tools was a reasonable
+  response to a non-functional tool, but the reason was wrong.
+- v28 also changes the shared tool layer (`base`, `execution`, `workspace`). Local
+  proxy results from v25 may not reflect official behavior. Re-validate locally on v28.
+- Recommended: point the local venv at v28, and add a notebook check that asserts the
+  mounted wheel sha256 equals `27a2f60f…` so each run fails fast on a different build.
