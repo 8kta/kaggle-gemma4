@@ -1838,3 +1838,12 @@ either direction. The real test remains the planned official-model
   has sha256 `27a2f60f…` and the installed `graph_utils.py` has sha256 `e48d9f0c…`.
   A different build stops the run immediately.
 - Local v25 results are no longer the reference. Re-validate the candidate on v28 locally before trusting local proxy numbers.
+
+## 2026-10-05 — graph recall check vs grep (offline, 19 comparison tasks)
+- Question: does graph retrieval, on the v28 build, reach the files the gold patch edits, enough to justify returning it to the agent?
+- Method: identifiers from each problem statement that match a graph node's last name. Graph: the real `search_similar_code` tool on the full dotted node name (k=10). Grep: `grep -rlw` for the same identifiers over each base-commit snapshot. Gold files come from the patch's `+++ b/` paths, tests excluded. Module mapping strips a leading `src.` (requests graph uses `requests.models`).
+- Results:
+  - Graph: 9/19 tasks reach at least one gold file, 9/37 gold files overall (24%), 70 queries.
+  - Grep: 11/19 tasks reach at least one gold file, 13/37 gold files overall (35%), 36 queries, about 58 files returned per query.
+- Caveat: the graph side uses only identifiers that already exist in the graph, which is generous to the graph. Grep is an upper bound too, since it sees the snapshot directly.
+- Conclusion: on v28, graph retrieval reaches fewer gold files than grep and needs exact dotted names. The graph tools do not justify returning to the candidate. Keep filesystem-only.
