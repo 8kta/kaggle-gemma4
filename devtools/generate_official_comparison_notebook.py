@@ -53,7 +53,7 @@ COHORTS_PATH = REPO_DIR / "experiments" / "cohorts.json"
 # results are still safe in MLflow/CHANGELOG under
 # '2026-09-30_official-comparison-v1'). Bump VERSION_TAG for each new
 # variant generated from this script.
-VERSION_TAG = "filesystem-only"
+VERSION_TAG = "filesystem-only-graphdebug"
 OUT_PATH = REPO_DIR / "devtools" / "kaggle_notebooks" / f"official_baseline_comparison_{VERSION_TAG}.ipynb"
 
 # Same budgets as the smoke notebook — identical methodology, so this run's
@@ -399,6 +399,18 @@ def build_notebook() -> dict:
             "    model_prefix='openai/',",
             "    api_key=INFERENCE_API_KEY,",
             ")",
+        ),
+        md("## 5b. Graph directory resolution (debug)"),
+        code(
+            "import os",
+            "",
+            "print('CWD:', os.getcwd())",
+            "for rel in ['data/graphs', 'data/embeddings']:",
+            "    print(f'{rel} exists relative to CWD: {Path(rel).exists()}')",
+            "for sub, pattern in [('graphs', '*.json'), ('embeddings', '*.npz')]:",
+            "    d = TASKS_PATH.parent / sub",
+            "    n = len(list(d.glob(pattern))) if d.is_dir() else 0",
+            "    print(f'{d}: is_dir={d.is_dir()}, files={n}')",
         ),
         md("## 6. Run the comparison cohort — Phase 1 inference + Phase 2 verification"),
         code(

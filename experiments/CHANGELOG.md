@@ -1717,3 +1717,35 @@ either direction. The real test remains the planned official-model
 - Results dir: N/A locally (ingested from manual_kaggle_results).
 - Commit: `a8f2d9a` (verified against the snapshot).
 - MLflow: http://localhost:5001/#/experiments/9/runs/aa8fde5f105f48c6a6d5470dae98d3ad
+
+## 2026-10-05 — graph lookup diagnosis (search_similar_code empties)
+- Question: were the 30/30 empty `search_similar_code` results in the official
+  runs evidence that graph retrieval doesn't work, or a lookup problem?
+- Finding 1: graph and embedding data exist for every task. The competition
+  dataset has 127 graph JSONs and 127 `.npz` files, one per base commit. For
+  each failing task (`fastapi_14246`, `fastapi_9425`, `fastapi_14266`,
+  `rich_3521`), the task's own base-commit graph file exists.
+- Finding 2: the retrieval engine works locally. Using the task's `base_commit`
+  and the harness's `repo_name` form (`fastapi/fastapi` or `fastapi`), the same
+  queries the official run got 0 results for now return 3 each:
+  `get_openapi`, `response_model`, `split_cells`. Using `class APIRouter`
+  returns 0 locally too.
+- Finding 3: query form matters. Queries with a space (`class X`, `def X`,
+  `openapi security`) return 0 in `get_similar_nodes`; the node-name resolver
+  matches on `.`/`;` boundaries, so a phrase never resolves. Bare identifiers
+  return results, but they are embedding neighbors, not exact symbol matches:
+  `get_openapi` returned `get_cached_model_fields` and `get_swagger_ui_html` as
+  top hits, not `get_openapi` itself.
+- Finding 4 (not resolved): the official run returned `status: ok, count: 0`
+  for queries that return results locally. A missing graph file raises an
+  error, so the graph was found, but something inside the Kaggle run returned
+  no matches. Candidate: `graph_dir`/`embeddings_dir` resolution. Auto-detection
+  in `swegemma/config.py` only runs when `graph_dir == 'data/graphs'` and that
+  path does not exist relative to CWD; if a `data/graphs` exists in CWD, the
+  shipped graphs are never used. The run artifacts do not record the
+  resolved `graph_dir`, so this can't be checked from the downloads.
+- Next check: add a notebook cell that prints `os.getcwd()`, `ctx.graph_dir`,
+  `ctx.embeddings_dir`, and whether each exists, then re-run the 4 failing
+  queries directly against those paths.
+- Status: diagnosis only; no change to `submission/` or the notebooks.
+  Uncommitted.
