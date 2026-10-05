@@ -1791,3 +1791,11 @@ either direction. The real test remains the planned official-model
 - Next: run the regenerated `graph-lookup-debug-v1.ipynb` on Kaggle and paste
   cells A, B, and B2 output, including any `Failed to load embeddings` warning
   printed to stderr.
+
+## 2026-10-05 — Kaggle runs a different swegemma build than the local wheel (critical)
+- Kaggle cell B2: `graph_utils` has no `resolve_node_name`; the local version-25 wheel does.
+- Kaggle cell B: warning `Could not obtain embedding for node get_openapi`. That text is not in the local version-25 wheel.
+- Kaggle cell C (relative `data/graphs`): error `Repository fastapi/fastapi not found in local files at data/graphs/...`. That text is not in the local version-25 wheel. Locally the same call returned results.
+- Cause (strongly suggested, not yet confirmed): `devtools/generate_*_notebook.py` installs the wheelhouse by its unversioned Kaggle path, which resolves to the latest dataset version on Kaggle. The local copy is version 25, so the Kaggle build is probably newer.
+- Impact: all official-model runs (comparison-v1, navigator-v2, filesystem-only, filesystem-only re-run) used this Kaggle build. The graph-tool conclusions and the local-dry-run analysis describe version 25, not what ran in the official runs.
+- Next: cell A0 prints the installed swegemma version and the wheelhouse listing. Paste its output. Then pin the notebooks to a specific wheelhouse version, and re-check the graph tool on that build.
