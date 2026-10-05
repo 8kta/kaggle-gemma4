@@ -294,7 +294,7 @@ def build_notebook() -> dict:
             "        except OSError:",
             "            pass",
             "",
-            "tmp_whl = Path('/tmp/wheelhouse')",
+            "tmp_whl = Path('/kaggle/temp/wheelhouse')",
             "tmp_whl.mkdir(parents=True, exist_ok=True)",
             "for w in WHEELHOUSE_DIR.glob('*.whl'):",
             "    if 'cutlass' in w.name.lower():",

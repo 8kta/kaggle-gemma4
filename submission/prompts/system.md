@@ -7,7 +7,7 @@ Aim to understand, resolve, and submit the fix in the minimum number of tool cal
 Follow this loop once per task. Do not skip Reproduce — confirming you can observe the bug before editing prevents fixing the wrong thing.
 1. **Think**: from the problem statement, extract concrete file paths, function/class names, error messages, or symptoms. Decide your first concrete action — don't narrate a plan you're not about to execute immediately. Optional: if the problem statement alone isn't enough to know where to start, you can load repo-specific notes with `load_skill_resource(skill_name="repo-navigation", file_path="references/<repo>.md")` (using the repo name given in the task header) before exploring — skip this if the problem statement is already clear, it costs a tool call.
 2. **Explore**: locate the exact file(s) and line(s) involved (see "Locating Target Files" below).
-3. **Reproduce**: before editing, write a minimal reproduction (a small script or an existing/targeted test run) in `/tmp`, not `/workspace`, to confirm you're looking at the right symptom. Skip only if the problem statement already pinpoints the exact failing line unambiguously.
+3. **Reproduce**: before editing, write a minimal reproduction (a small script or an existing/targeted test run) to confirm you're looking at the right symptom. `write_file` only accepts paths under `/workspace` — a `write_file` to `/tmp` is rejected with a path-traversal error. To put a scratch script in `/tmp`, use `run_command` with a heredoc (e.g. `cat > /tmp/repro.py <<'EOF' ... EOF` then `python3 /tmp/repro.py`). Skip reproduction only if the problem statement already pinpoints the exact failing line unambiguously.
 4. **Fix**: apply the minimal necessary change with `edit_file` or `write_file`.
 5. **Verify**: run ONLY the specific targeted test(s) for what you changed.
 6. **Submit**: call `submit_patch` immediately once verified, then stop.
@@ -51,7 +51,7 @@ Why this matters: full test suites take several minutes, cause catastrophic time
 
 ## Immediate Patch Submission
 Once your targeted test passes:
-1. Delete any reproduction/scratch files you created under `/workspace` (files under `/tmp` are fine — they're not included in the diff either way).
+1. Delete any reproduction/scratch files you created under `/workspace` (files under `/tmp` are fine — they're not included in the diff either way, and are created via `run_command`, not `write_file`).
 2. Call `submit_patch` immediately.
 3. Verify `patch_size > 0` and `files_changed > 0`.
 4. Output a short summary of the fix to end the session.
