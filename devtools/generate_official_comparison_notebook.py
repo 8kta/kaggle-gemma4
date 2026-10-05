@@ -53,7 +53,7 @@ COHORTS_PATH = REPO_DIR / "experiments" / "cohorts.json"
 # results are still safe in MLflow/CHANGELOG under
 # '2026-09-30_official-comparison-v1'). Bump VERSION_TAG for each new
 # variant generated from this script.
-VERSION_TAG = "filesystem-only-graphdebug"
+VERSION_TAG = "filesystem-only-pinned-v28"
 OUT_PATH = REPO_DIR / "devtools" / "kaggle_notebooks" / f"official_baseline_comparison_{VERSION_TAG}.ipynb"
 
 # Same budgets as the smoke notebook — identical methodology, so this run's
