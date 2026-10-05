@@ -1829,3 +1829,12 @@ either direction. The real test remains the planned official-model
   proxy results from v25 may not reflect official behavior. Re-validate locally on v28.
 - Recommended: point the local venv at v28, and add a notebook check that asserts the
   mounted wheel sha256 equals `27a2f60f…` so each run fails fast on a different build.
+
+## 2026-10-05 — local venv pinned to wheelhouse v28; notebooks fail fast on a different build
+- Reinstalled swegemma v28 into `.venv` (`pip install --no-deps --force-reinstall`).
+  Installed `graph_utils.py` sha256 now `e48d9f0c…`, matching Kaggle's.
+- All official notebook generators (baseline, comparison, maxturns) and the graph
+  debug notebook now assert, right after install, that the mounted swegemma wheel
+  has sha256 `27a2f60f…` and the installed `graph_utils.py` has sha256 `e48d9f0c…`.
+  A different build stops the run immediately.
+- Local v25 results are no longer the reference. Re-validate the candidate on v28 locally before trusting local proxy numbers.
