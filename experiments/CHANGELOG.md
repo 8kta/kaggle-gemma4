@@ -1847,3 +1847,11 @@ either direction. The real test remains the planned official-model
   - Grep: 11/19 tasks reach at least one gold file, 13/37 gold files overall (35%), 36 queries, about 58 files returned per query.
 - Caveat: the graph side uses only identifiers that already exist in the graph, which is generous to the graph. Grep is an upper bound too, since it sees the snapshot directly.
 - Conclusion: on v28, graph retrieval reaches fewer gold files than grep and needs exact dotted names. The graph tools do not justify returning to the candidate. Keep filesystem-only.
+
+## 2026-10-05 — ast definition index vs grep (offline, 19 comparison tasks)
+- Question: does an exact-definition index (Python `ast`, `file` where the identifier is defined) reduce grep's noise without losing recall? Same identifiers and gold files as the graph and grep checks.
+- Results:
+  - Definition index: 7/19 tasks reach a gold file, 7/37 gold files (19%), 2.7 files per query.
+  - Grep: 11/19 tasks, 13/37 gold files (35%), 57.9 files per query.
+- Reading: the definition index is about 21x more precise, but it misses roughly half the gold files that grep finds. Gold files often use an identifier rather than define it, and definitions can't see those uses.
+- Conclusion: not worth integrating as a replacement for grep. A combined ranking (definitions first, grep for usages) is the only version that could help, and it isn't built or tested.
