@@ -47,3 +47,6 @@ venv/
 .DS_Store
 
 .idea/
+
+# Local model runs (per-machine results)
+local_runs/
