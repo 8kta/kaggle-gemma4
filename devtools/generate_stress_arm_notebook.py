@@ -27,13 +27,30 @@ def patch_max_output_tokens(submission: Path, value: int) -> None:
 
 
 def patch_turn_efficiency(submission: Path) -> None:
-    """Batch related searches into one grep call, use read_file line ranges instead of
-    whole-file/cat reads, stop immediately after a passing test, and read the traceback
-    before retrying a failing one. See experiments/CHANGELOG.md 2026-10-07 entry for the
-    trace evidence this responds to (9/19 tasks never reach edit_file; passing tests
-    followed by further unneeded exploration instead of submit_patch)."""
+    """v2: bounded-output batched search (cap 2 patterns + head -n 30), read only the
+    edited range after a Fix instead of re-reading the whole file, use read_file line
+    ranges instead of whole-file/cat reads, stop immediately after a passing test, and
+    read the traceback before retrying a failing one.
+
+    v1 (2026-10-07 stress test) regressed: an uncapped `grep -e A -e B -e C` returned
+    6,601 chars in one call (rich_3953) and repeated whole-file read_file calls after
+    each edit (fastapi_14186, 5 full reads of one file) pushed both tasks over the
+    32768-token context ceiling in fewer turns than the unmodified prompt, with zero
+    resolution gain. See experiments/CHANGELOG.md 2026-10-07 entries for the trace
+    evidence. v2 bounds the two things that caused that: batched-call output size, and
+    post-edit whole-file re-reads."""
     sysmd = submission / "prompts" / "system.md"
     text = sysmd.read_text()
+
+    old_fix = "4. **Fix**: apply the minimal necessary change with `edit_file` or `write_file`."
+    new_fix = (
+        "4. **Fix**: apply the minimal necessary change with `edit_file` or `write_file`. "
+        "If you need to confirm the result, read only the lines you changed with "
+        "`read_file(filepath, start_line, end_line)` — do not re-read the whole file; "
+        "`edit_file`'s own response already shows you the change took effect."
+    )
+    assert text.count(old_fix) == 1
+    text = text.replace(old_fix, new_fix)
 
     old_verify = (
         "5. **Verify**: run ONLY the specific targeted test(s) for what you changed.\n"
@@ -64,12 +81,14 @@ def patch_turn_efficiency(submission: Path) -> None:
         "that line range — use it instead of reading a whole file or `cat`-ing it when you "
         "already know roughly where the relevant code is (e.g. from a grep match's line number).\n"
         "- If the problem statement gives you a symbol or error message but not a file path, "
-        "search for it directly: `grep -rn 'symbol_or_keyword' --include='*.py' .` or "
-        "`find . -iname '*keyword*'` via `run_command`. If you need to search for more than "
-        "one related name, search for all of them in ONE call — "
-        "`grep -rn -e 'NameA' -e 'NameB' -e 'NameC' --include='*.py' .` — instead of one "
-        "`grep` per name. Each separate search is a full turn against your 15-turn budget; "
-        "predict what you'll need to search for and combine it."
+        "search for it directly: `grep -rn 'symbol_or_keyword' --include='*.py' . | head -n 30` "
+        "or `find . -iname '*keyword*'` via `run_command` — always pipe `grep -r` through "
+        "`head -n 30` so one unexpectedly common term can't fill your context with matches. "
+        "If you need to search for exactly two closely related names (e.g. a class and its "
+        "one expected subclass), you may combine them in one call — "
+        "`grep -rn -e 'NameA' -e 'NameB' --include='*.py' . | head -n 30` — but never combine "
+        "more than two, and never combine unrelated terms: a bigger combined match list costs "
+        "more context than the turn it saves. When in doubt, search one term at a time."
     )
     assert text.count(old_locate) == 1
     text = text.replace(old_locate, new_locate)
