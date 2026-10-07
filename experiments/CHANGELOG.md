@@ -1855,3 +1855,37 @@ either direction. The real test remains the planned official-model
   - Grep: 11/19 tasks, 13/37 gold files (35%), 57.9 files per query.
 - Reading: the definition index is about 21x more precise, but it misses roughly half the gold files that grep finds. Gold files often use an identifier rather than define it, and definitions can't see those uses.
 - Conclusion: not worth integrating as a replacement for grep. A combined ranking (definitions first, grep for usages) is the only version that could help, and it isn't built or tested.
+
+## 2026-10-07 — turn-efficiency stress test: regression, not an improvement
+- Ran `official_baseline_stress_turn-efficiency.ipynb` (4 stress tasks,
+  pinned v28, same budgets as the comparison cohort). Compared against the
+  same 4 tasks from the 2026-10-05 wordingfix 19-task run (same wheel,
+  same budgets, prior prompt).
+- Result: `resolution_rate=1/4`, same as baseline (`rich_3518` only, unchanged
+  in both). No task gained resolution. Two tasks regressed:
+  - `fastapi_14186`: baseline ran 12 calls, turn-budget exhausted, 0 patch.
+    New: crashed at 10 calls with `ContextWindowExceededError`
+    (24577 input tokens + 8192 output tokens > 32768 ceiling). Cause: the
+    agent read the same file (`fastapi/_compat/v1.py`) 5 times and edited it
+    3 times; it never used the new `read_file(start_line, end_line)`
+    guidance — that part of the change had no effect on this task.
+  - `rich_3953`: baseline ran 14 calls, turn-budget exhausted, 846-byte
+    patch (unresolved but a real attempt). New: crashed at 9 calls with the
+    same `ContextWindowExceededError`, 0 patch — the 846-byte attempt is
+    gone entirely. Cause: the batched-search rule worked as written —
+    `grep -rn -e "joiner" -e "emoji" --include='*.py' .` — but combining two
+    unrelated terms into one call returned 6,601 characters, the single
+    largest observation in the trace, which traded turns for a bigger
+    per-call context cost.
+  - `fastapi_14266`: unchanged (14 calls, turn-budget exhausted, 0 patch).
+- Reading: for tasks where context (not turns) is the binding constraint,
+  trading several small-output turns for fewer large-output turns is a net
+  loss. The stop-after-pass and traceback-first rules were never exercised
+  here (neither task reached a test). The batched-search instruction needs
+  a cap (e.g. 2 patterns, or pipe through `head`) before it's tried again,
+  and "don't re-read a file you already have" needs to be stronger — the
+  `read_file` range hint alone did not stop `fastapi_14186`'s 5 full reads
+  of the same file.
+- Decision: do NOT run the 19-task `turn-efficiency-19task` notebook with
+  this version of the prompt — this stress result argues it would likely
+  cost GPU time to confirm a regression, not a gain. Revise first.
